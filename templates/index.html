@@ -1,0 +1,1749 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>LinkedScan — People Intelligence</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&family=DM+Mono:wght@400;500&family=Playfair+Display:wght@700;900&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+<style>
+/* ── TOKENS ── */
+:root {
+  --ff: 'DM Sans', sans-serif;
+  --mono: 'DM Mono', monospace;
+  --display: 'Playfair Display', serif;
+  --red: #dc2626; --red-l: #ef4444; --red-d: #991b1b;
+  --red-a: rgba(220,38,38,.1); --red-g: rgba(220,38,38,.25);
+  --ease: .2s cubic-bezier(.4,0,.2,1);
+}
+[data-theme="dark"] {
+  --bg:#0c0c0e; --bg2:#111115; --s:#16161a; --s2:#1c1c22; --s3:#222228;
+  --b:#2a2a32; --b2:#36363f;
+  --t1:#f0f0f5; --t2:#9090a4; --t3:#50506a;
+  --sh:rgba(0,0,0,.5); --cg:rgba(255,255,255,.05); --cl:#50506a;
+  --green:#22c55e; --ga:rgba(34,197,94,.12);
+  --amber:#f59e0b; --aa:rgba(245,158,11,.12);
+  --blue:#3b82f6; --ba:rgba(59,130,246,.12);
+  --purple:#a855f7; --pa:rgba(168,85,247,.12);
+}
+[data-theme="light"] {
+  --bg:#f6f6fa; --bg2:#ffffff; --s:#ffffff; --s2:#f2f2f8; --s3:#ebebf4;
+  --b:#e2e2ec; --b2:#ccccd8;
+  --t1:#111118; --t2:#52526a; --t3:#9494b0;
+  --sh:rgba(0,0,0,.07); --cg:rgba(0,0,0,.05); --cl:#9494b0;
+  --green:#16a34a; --ga:rgba(22,163,74,.1);
+  --amber:#d97706; --aa:rgba(217,119,6,.1);
+  --blue:#2563eb; --ba:rgba(37,99,235,.1);
+  --purple:#9333ea; --pa:rgba(147,51,234,.1);
+}
+
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--t1);font-family:var(--ff);font-size:14px;min-height:100vh;overflow-x:hidden;transition:background var(--ease),color var(--ease)}
+::-webkit-scrollbar{width:5px;height:5px}
+::-webkit-scrollbar-track{background:transparent}
+::-webkit-scrollbar-thumb{background:var(--b);border-radius:99px}
+
+/* ── SUPABASE SETUP OVERLAY ── */
+#sb-overlay {
+  position:fixed;inset:0;z-index:9999;
+  background:rgba(0,0,0,.85);backdrop-filter:blur(12px);
+  display:flex;align-items:center;justify-content:center;
+  animation:fade-in .3s ease;
+}
+@keyframes fade-in{from{opacity:0}to{opacity:1}}
+.sb-wizard {
+  background:var(--s);border:1px solid var(--b2);border-radius:20px;
+  width:540px;max-width:94vw;max-height:90vh;overflow-y:auto;
+  padding:36px;box-shadow:0 32px 80px var(--sh);
+  animation:slide-up .35s ease;
+}
+@keyframes slide-up{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:none}}
+.wiz-step{display:none}
+.wiz-step.active{display:block}
+.wiz-logo{display:flex;align-items:center;gap:10px;margin-bottom:24px}
+.wiz-lm{width:36px;height:36px;background:var(--red);border-radius:10px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:17px;font-weight:900;color:#fff;box-shadow:0 4px 16px var(--red-g)}
+.wiz-ln{font-family:var(--display);font-size:20px;font-weight:900;color:var(--t1)}
+.wiz-ln span{color:var(--red)}
+.wiz-title{font-family:var(--display);font-size:1.6rem;font-weight:700;color:var(--t1);margin-bottom:6px}
+.wiz-sub{font-size:12px;color:var(--t3);font-family:var(--mono);margin-bottom:24px;line-height:1.7}
+.step-pills{display:flex;gap:6px;margin-bottom:28px}
+.sp{height:4px;flex:1;background:var(--s3);border-radius:99px;transition:background .4s}
+.sp.done{background:var(--red)}
+.wiz-field{margin-bottom:16px}
+.wiz-label{font-size:11px;font-weight:600;color:var(--t2);margin-bottom:5px;display:flex;align-items:center;justify-content:space-between}
+.wiz-input{
+  width:100%;background:var(--s2);border:1px solid var(--b);border-radius:10px;
+  color:var(--t1);font-family:var(--mono);font-size:12px;
+  padding:10px 14px;outline:none;transition:all var(--ease);
+}
+.wiz-input:focus{border-color:var(--red);background:var(--bg2);box-shadow:0 0 0 3px var(--red-a)}
+.wiz-input::placeholder{color:var(--t3)}
+.hint-box{
+  background:var(--s2);border:1px solid var(--b);border-radius:10px;
+  padding:14px 16px;margin-bottom:16px;font-size:12px;color:var(--t2);line-height:1.8;
+}
+.hint-box strong{color:var(--t1)}
+.hint-box code{background:var(--red-a);color:var(--red);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:11px}
+.hint-box ol,.hint-box ul{padding-left:18px;margin-top:6px}
+.hint-box li{margin-bottom:3px}
+.wiz-actions{display:flex;gap:10px;justify-content:flex-end;margin-top:24px}
+.wiz-btn{
+  padding:10px 22px;border-radius:10px;font-weight:600;font-size:13px;
+  cursor:pointer;transition:all var(--ease);border:1px solid transparent;
+}
+.wiz-btn.primary{background:var(--red);color:#fff;border-color:var(--red)}
+.wiz-btn.primary:hover{background:var(--red-l);box-shadow:0 4px 16px var(--red-g);transform:translateY(-1px)}
+.wiz-btn.secondary{background:transparent;color:var(--t2);border-color:var(--b)}
+.wiz-btn.secondary:hover{border-color:var(--b2);background:var(--s2)}
+.wiz-btn:disabled{opacity:.4;cursor:not-allowed;transform:none;box-shadow:none}
+.sb-status{
+  display:flex;align-items:center;gap:8px;padding:10px 14px;
+  border-radius:10px;font-size:12px;font-weight:500;margin-top:12px;
+}
+.sb-status.ok{background:var(--ga);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.sb-status.err{background:var(--red-a);color:var(--red);border:1px solid rgba(220,38,38,.2)}
+.sb-status.testing{background:var(--aa);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+.skip-link{font-size:11px;color:var(--t3);cursor:pointer;text-decoration:underline;margin-left:auto}
+.skip-link:hover{color:var(--t2)}
+
+/* ── HEADER ── */
+#hdr{position:sticky;top:0;z-index:600;background:rgba(var(--bg-raw,12,12,14),.92);border-bottom:1px solid var(--b);backdrop-filter:blur(20px);transition:all var(--ease)}
+[data-theme="dark"] #hdr{background:rgba(12,12,14,.92)}
+[data-theme="light"] #hdr{background:rgba(255,255,255,.92)}
+.hdr-wrap{max-width:1500px;margin:0 auto;display:flex;align-items:center;height:58px;padding:0 18px;gap:6px}
+.logo{display:flex;align-items:center;gap:10px;cursor:pointer;margin-right:6px}
+.logo-m{width:30px;height:30px;background:var(--red);border-radius:8px;display:flex;align-items:center;justify-content:center;font-family:var(--display);font-size:14px;font-weight:900;color:#fff;box-shadow:0 2px 10px var(--red-g);transition:all var(--ease)}
+.logo:hover .logo-m{transform:scale(1.08);box-shadow:0 4px 18px var(--red-g)}
+.logo-n{font-family:var(--display);font-size:17px;font-weight:900;color:var(--t1)}
+.logo-n span{color:var(--red)}
+.logo-v{font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.12em;text-transform:uppercase;display:block}
+
+.nav{display:flex;align-items:center;gap:2px;flex:1;padding:0 8px}
+.nt{
+  display:flex;align-items:center;gap:6px;padding:6px 13px;border-radius:8px;
+  font-size:13px;font-weight:500;color:var(--t2);cursor:pointer;
+  border:none;background:transparent;transition:all var(--ease);
+}
+.nt:hover{background:var(--s2);color:var(--t1)}
+.nt.active{background:var(--red-a);color:var(--red);font-weight:600}
+.nt .badge{min-width:18px;height:18px;padding:0 5px;background:var(--red);color:#fff;border-radius:99px;font-size:10px;font-weight:700;display:flex;align-items:center;justify-content:center}
+
+/* Cloud status pill */
+.cloud-pill{
+  display:flex;align-items:center;gap:6px;padding:5px 12px;
+  border-radius:99px;border:1px solid var(--b);background:var(--s2);
+  font-family:var(--mono);font-size:10px;color:var(--t2);cursor:pointer;
+  transition:all var(--ease);
+}
+.cloud-pill:hover{border-color:var(--b2)}
+.cloud-dot{width:6px;height:6px;border-radius:50%}
+.cloud-dot.connected{background:var(--green);box-shadow:0 0 0 2px var(--ga);animation:pulse-d 2s infinite}
+.cloud-dot.disconnected{background:var(--t3)}
+@keyframes pulse-d{0%,100%{opacity:1}50%{opacity:.4}}
+
+.hdr-r{display:flex;align-items:center;gap:8px;margin-left:auto}
+.clock{font-family:var(--mono);font-size:12px;color:var(--t2)}
+
+/* Theme toggle */
+.theme-tog{
+  width:48px;height:26px;border-radius:99px;position:relative;cursor:pointer;
+  background:var(--s3);border:1px solid var(--b);transition:all var(--ease);flex-shrink:0;
+}
+.theme-tog:hover{border-color:var(--b2)}
+.theme-thumb{
+  position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;
+  background:var(--t2);transition:transform .3s cubic-bezier(.34,1.56,.64,1);
+  display:flex;align-items:center;justify-content:center;font-size:10px;
+}
+[data-theme="light"] .theme-thumb{transform:translateX(22px)}
+.theme-icons{display:flex;align-items:center;justify-content:space-around;height:100%;padding:0 4px;pointer-events:none;font-size:10px}
+
+/* ── PAGES ── */
+.page{display:none}
+.page.active{display:block}
+
+/* ── SCRAPER LAYOUT ── */
+.scraper-layout{display:grid;grid-template-columns:280px 1fr;height:calc(100vh - 58px);overflow:hidden}
+
+/* SIDEBAR */
+.sidebar{background:var(--s);border-right:1px solid var(--b);overflow-y:auto;transition:all var(--ease)}
+.sb-sec{padding:18px;border-bottom:1px solid var(--b)}
+.sb-lbl{font-size:9px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:var(--t3);margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.sb-lbl::after{content:'';flex:1;height:1px;background:var(--b)}
+
+/* Fields */
+.field{margin-bottom:11px}
+.field:last-child{margin-bottom:0}
+.f-label{font-size:11px;font-weight:600;color:var(--t2);margin-bottom:4px;display:block}
+.f-wrap{position:relative}
+.f-input{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t1);font-family:var(--mono);font-size:12px;padding:8px 32px 8px 10px;outline:none;transition:all var(--ease)}
+.f-input:focus{border-color:var(--red);background:var(--bg2);box-shadow:0 0 0 3px var(--red-a)}
+.f-input::placeholder{color:var(--t3)}
+.f-ico{position:absolute;right:9px;top:50%;transform:translateY(-50%);color:var(--t3);font-size:12px;cursor:pointer;transition:color var(--ease);user-select:none}
+.f-ico:hover{color:var(--red)}
+.cred-ok{margin-top:7px;font-size:11px;color:var(--t3);display:flex;align-items:center;gap:5px}
+.cred-ok.valid{color:var(--green)}
+
+/* Dropzone */
+.dz{border:1.5px dashed var(--b2);border-radius:10px;padding:20px 14px;text-align:center;cursor:pointer;position:relative;background:var(--s2);transition:all var(--ease);overflow:hidden}
+.dz:hover,.dz.over{border-color:var(--red);border-style:solid;background:var(--red-a)}
+.dz input{position:absolute;inset:0;opacity:0;cursor:pointer;width:100%;height:100%}
+.dz-i{font-size:22px;margin-bottom:7px;display:block;transition:transform var(--ease)}
+.dz:hover .dz-i{transform:translateY(-3px)}
+.dz-t{font-size:12px;font-weight:600;margin-bottom:2px}
+.dz-s{font-size:10px;color:var(--t3)}
+.dz-fn{margin-top:8px;font-family:var(--mono);font-size:10px;color:var(--red);min-height:14px}
+.fmt-row{display:flex;gap:4px;justify-content:center;margin-top:8px}
+.fmt{padding:2px 7px;border:1px solid var(--b);border-radius:99px;font-size:9px;color:var(--t3);font-weight:500}
+
+/* Queue */
+.q-empty{font-size:11px;color:var(--t3);text-align:center;padding:6px 0;font-family:var(--mono)}
+.qi{background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:11px;margin-bottom:7px;animation:qi-in .3s ease}
+@keyframes qi-in{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
+.qi-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
+.qidot{width:7px;height:7px;border-radius:50%;flex-shrink:0;transition:all var(--ease)}
+.qidot.queued{background:var(--t3)}
+.qidot.running{background:var(--red);box-shadow:0 0 0 3px var(--red-a);animation:pulse-d 1s infinite}
+.qidot.paused{background:var(--amber)}
+.qidot.done{background:var(--green);box-shadow:0 0 0 3px var(--ga)}
+.qidot.error,.qidot.stopped{background:var(--red)}
+.qi-name{font-size:11px;font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.qi-acts{display:flex;gap:3px}
+.qi-btn{width:22px;height:22px;border-radius:5px;border:1px solid var(--b);background:transparent;color:var(--t2);cursor:pointer;font-size:10px;display:flex;align-items:center;justify-content:center;transition:all var(--ease)}
+.qi-btn:hover{border-color:var(--red);color:var(--red);background:var(--red-a)}
+.qi-btn.g:hover{border-color:var(--green);color:var(--green);background:var(--ga)}
+.qi-meta{font-size:10px;color:var(--t3);margin-bottom:5px;font-family:var(--mono)}
+.qi-bar{height:2px;background:var(--b);border-radius:99px;overflow:hidden}
+.qi-fill{height:100%;background:var(--red);border-radius:99px;width:0%;transition:width .5s}
+.qi-fill.done{background:var(--green)}
+
+/* Mini KPI */
+.mkpi-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.mkpi{background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:10px;text-align:center;transition:all var(--ease)}
+.mkpi-v{font-family:var(--display);font-size:21px;font-weight:700;color:var(--red);line-height:1}
+.mkpi-v.g{color:var(--green)}.mkpi-v.dim{color:var(--t2);font-size:16px}
+.mkpi-l{font-size:9px;color:var(--t3);font-weight:600;margin-top:2px;text-transform:uppercase;letter-spacing:.05em}
+
+/* Cloud indicator in sidebar */
+.cloud-badge{
+  display:flex;align-items:center;gap:7px;padding:9px 12px;
+  border-radius:10px;border:1px solid var(--b);background:var(--s2);font-size:11px;
+  color:var(--t2);transition:all var(--ease);cursor:pointer;margin-top:8px;
+}
+.cloud-badge:hover{border-color:var(--b2)}
+.cloud-badge.ok{border-color:rgba(34,197,94,.3);background:var(--ga);color:var(--green)}
+.cloud-badge.warn{border-color:rgba(245,158,11,.3);background:var(--aa);color:var(--amber)}
+
+/* ── MAIN ── */
+.main-col{display:flex;flex-direction:column;overflow:hidden}
+
+/* Toolbar */
+.tb{display:flex;align-items:center;gap:7px;flex-wrap:wrap;padding:11px 18px;background:var(--s);border-bottom:1px solid var(--b);transition:all var(--ease)}
+.tb-g{display:flex;align-items:center;gap:5px}
+.tb-sep{width:1px;height:22px;background:var(--b);margin:0 3px}
+
+.btn{display:inline-flex;align-items:center;gap:5px;padding:0 13px;height:32px;border-radius:8px;font-family:var(--ff);font-weight:600;font-size:12px;cursor:pointer;transition:all var(--ease);border:1px solid transparent;white-space:nowrap}
+.btn svg{width:12px;height:12px;flex-shrink:0}
+.btn.p{background:var(--red);color:#fff;border-color:var(--red)}
+.btn.p:hover:not(:disabled){background:var(--red-l);box-shadow:0 4px 14px var(--red-g);transform:translateY(-1px)}
+.btn.p:disabled{opacity:.3;cursor:not-allowed;transform:none;box-shadow:none}
+.btn.o{background:transparent;color:var(--t2);border-color:var(--b)}
+.btn.o:hover:not(:disabled){border-color:var(--b2);color:var(--t1);background:var(--s2)}
+.btn.o:disabled{opacity:.3;cursor:not-allowed}
+.btn.d{background:transparent;color:var(--red);border-color:rgba(220,38,38,.2)}
+.btn.d:hover:not(:disabled){background:var(--red-a);border-color:var(--red)}
+.btn.d:disabled{opacity:.3;cursor:not-allowed}
+.btn.s{background:var(--ga);color:var(--green);border-color:rgba(34,197,94,.25)}
+.btn.s:hover:not(:disabled){background:rgba(34,197,94,.2)}
+.btn.s:disabled{opacity:.3;cursor:not-allowed}
+.btn.a{background:transparent;color:var(--amber);border-color:rgba(245,158,11,.25)}
+.btn.a:hover:not(:disabled){background:var(--aa)}
+.btn.a:disabled{opacity:.3;cursor:not-allowed}
+
+.tb-sel{height:32px;padding:0 10px;border-radius:8px;background:var(--s2);border:1px solid var(--b);color:var(--t1);font-family:var(--mono);font-size:11px;outline:none;cursor:pointer;transition:all var(--ease)}
+.tb-sel:focus{border-color:var(--red)}
+
+.st-pill{margin-left:auto;display:flex;align-items:center;gap:6px;padding:5px 13px;border-radius:99px;border:1px solid var(--b);background:var(--s2);font-size:11px;font-weight:600;color:var(--t2)}
+.spdot{width:7px;height:7px;border-radius:50%;background:var(--t3);transition:all var(--ease)}
+.spdot.running{background:var(--red);box-shadow:0 0 0 2px var(--red-a);animation:pulse-d 1s infinite}
+.spdot.paused{background:var(--amber)}
+.spdot.done{background:var(--green)}
+.spdot.error,.spdot.stopped{background:var(--red)}
+
+.done-badge{display:none;align-items:center;gap:6px;padding:4px 12px;border-radius:99px;background:var(--ga);border:1px solid rgba(34,197,94,.25);font-size:11px;color:var(--green);font-weight:600}
+.done-badge.show{display:flex}
+
+/* Progress zone */
+.pz{padding:14px 18px;background:var(--s);border-bottom:1px solid var(--b);flex-shrink:0;transition:all var(--ease)}
+.pz-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.pz-lbl{font-size:12px;color:var(--t2);font-weight:500}
+.pz-lbl strong{color:var(--t1)}
+.pz-pct{font-family:var(--display);font-size:22px;font-weight:700;color:var(--red)}
+.pz-track{height:4px;background:var(--s3);border-radius:99px;overflow:hidden;margin-bottom:12px}
+.pz-fill{height:100%;width:0%;border-radius:99px;background:linear-gradient(90deg,var(--red-d),var(--red),var(--red-l));background-size:200%;transition:width .6s cubic-bezier(.4,0,.2,1);animation:flow .2s linear infinite}
+@keyframes flow{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.pz-fill.paused{animation:none;background:var(--amber)}
+.pz-fill.done{animation:none;background:var(--green)}
+.pz-fill.stopped{animation:none;background:var(--s3)}
+.stats-strip{display:flex;gap:20px;flex-wrap:wrap}
+.st{display:flex;flex-direction:column;gap:1px}
+.st-v{font-family:var(--mono);font-size:15px;font-weight:500;color:var(--t1)}
+.st-v.r{color:var(--red)}.st-v.g{color:var(--green)}.st-v.dim{color:var(--t2);font-size:12px}
+.st-k{font-size:9px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:.08em}
+
+/* Results zone */
+.rz{flex:1;display:flex;flex-direction:column;overflow:hidden}
+.rt{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 18px;background:var(--s);border-bottom:1px solid var(--b);flex-shrink:0;transition:all var(--ease)}
+.rt-title{font-size:10px;font-weight:700;color:var(--t2);letter-spacing:.06em;text-transform:uppercase}
+.rt-cnt{font-family:var(--mono);font-size:10px;color:var(--red);background:var(--red-a);border:1px solid rgba(220,38,38,.2);padding:2px 8px;border-radius:99px}
+.rt-search{background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t1);font-family:var(--mono);font-size:11px;padding:5px 10px;outline:none;width:150px;transition:all var(--ease)}
+.rt-search:focus{border-color:var(--red);width:190px;background:var(--bg2)}
+.rt-search::placeholder{color:var(--t3)}
+.rt-sel{height:28px;padding:0 8px;border-radius:8px;background:var(--s2);border:1px solid var(--b);color:var(--t1);font-family:var(--mono);font-size:10px;outline:none;cursor:pointer}
+.rt-sel:focus{border-color:var(--red)}
+
+.tbl-wrap{flex:1;overflow:auto}
+table{width:100%;border-collapse:collapse}
+thead th{background:var(--s);padding:8px 14px;text-align:left;font-size:9px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:10;white-space:nowrap;transition:all var(--ease)}
+tbody tr{border-bottom:1px solid var(--b);transition:background var(--ease)}
+tbody tr:hover{background:var(--s2)}
+tbody td{padding:9px 14px;font-size:12px;color:var(--t1);max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+td.rn{color:var(--t3);font-family:var(--mono);font-size:10px;width:30px}
+td.rs{width:3px;padding:0!important}
+td.rs span{display:block;min-height:36px;height:100%;width:3px;border-radius:0 2px 2px 0}
+tr.rs-pending td.rs span{background:var(--b)}
+tr.rs-processing td.rs span{background:var(--red);box-shadow:0 0 8px var(--red-g)}
+tr.rs-done td.rs span{background:var(--green)}
+tr.rs-na td.rs span{background:var(--red-d)}
+.cnt-v{font-family:var(--mono);font-weight:500;font-size:13px;color:var(--red)}
+.cnt-v.p{color:var(--t3);font-size:11px}.cnt-v.na{color:var(--red-d)}
+/* range badges */
+.rb{display:inline-flex;align-items:center;padding:2px 8px;border-radius:99px;font-family:var(--mono);font-size:9px;font-weight:500}
+.rb-0{background:var(--s3);color:var(--t3);border:1px solid var(--b)}
+.rb-1{background:var(--ba);color:var(--blue);border:1px solid rgba(59,130,246,.2)}
+.rb-2{background:var(--aa);color:var(--amber);border:1px solid rgba(245,158,11,.2)}
+.rb-3{background:var(--ga);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.rb-4{background:var(--red-a);color:var(--red);border:1px solid rgba(220,38,38,.2)}
+.rb-5{background:var(--pa);color:var(--purple);border:1px solid rgba(168,85,247,.2)}
+.rb-6{background:rgba(236,72,153,.1);color:#ec4899;border:1px solid rgba(236,72,153,.2)}
+.rb-7{background:rgba(220,38,38,.15);color:var(--red-l);border:1px solid rgba(220,38,38,.3)}
+.stag{display:inline-flex;align-items:center;gap:3px;padding:2px 8px;border-radius:99px;font-size:10px;font-weight:500}
+.stag.pending{background:var(--s3);color:var(--t3)}
+.stag.processing{background:var(--red-a);color:var(--red)}
+.stag.done{background:var(--ga);color:var(--green)}
+.stag.na{background:rgba(220,38,38,.08);color:var(--red-d)}
+.url-c{color:var(--blue);font-size:10px;font-family:var(--mono)}
+.url-c a{color:inherit;text-decoration:none}
+.url-c a:hover{text-decoration:underline}
+.spin{display:inline-block;animation:sp .7s linear infinite}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* Empty */
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;padding:60px 24px;text-align:center}
+.empty-i{font-size:2.5rem;margin-bottom:14px;opacity:.2}
+.empty-h{font-family:var(--display);font-size:18px;font-weight:700;color:var(--t2);margin-bottom:7px}
+.empty-p{font-size:12px;color:var(--t3);line-height:1.9}
+
+/* Terminal */
+.term{height:110px;border-top:1px solid var(--b);background:var(--bg2);display:flex;flex-direction:column;flex-shrink:0;transition:all var(--ease)}
+.term-hdr{display:flex;align-items:center;gap:7px;padding:5px 14px;border-bottom:1px solid var(--b);flex-shrink:0}
+.term-dots{display:flex;gap:5px}
+.td{width:8px;height:8px;border-radius:50%}
+.td.r{background:#ff5f57}.td.y{background:#ffbd2e}.td.g{background:#28c840}
+.term-lbl{font-family:var(--mono);font-size:8px;color:var(--t3);letter-spacing:.15em;text-transform:uppercase;margin-left:4px;flex:1}
+.term-body{flex:1;overflow-y:auto;padding:6px 14px;font-family:var(--mono);font-size:10px;line-height:1.8}
+.log-r{display:flex;gap:10px;animation:l-in .2s ease}
+@keyframes l-in{from{opacity:0;transform:translateX(-3px)}to{opacity:1;transform:none}}
+.log-ts{color:var(--t3);font-size:9px;flex-shrink:0}
+.log-m.info{color:var(--t2)}.log-m.ok{color:var(--green)}.log-m.warn{color:var(--amber)}.log-m.err{color:var(--red)}.log-m.sys{color:var(--red-l)}
+
+/* ── HISTORY PAGE ── */
+.page-wrap{max-width:1100px;margin:0 auto;padding:28px 20px 80px}
+.ph{margin-bottom:24px}
+.ph-h{font-family:var(--display);font-size:1.8rem;font-weight:900;color:var(--t1);margin-bottom:4px}
+.ph-h span{color:var(--red)}
+.ph-s{font-size:12px;color:var(--t3);font-family:var(--mono)}
+
+/* Cloud sync banner */
+.sync-banner{
+  display:flex;align-items:center;gap:14px;
+  background:var(--s);border:1px solid var(--b);border-radius:14px;
+  padding:16px 18px;margin-bottom:20px;transition:all var(--ease);
+}
+.sync-banner.synced{border-color:rgba(34,197,94,.3);background:var(--ga)}
+.sync-banner.unsynced{border-color:rgba(245,158,11,.3);background:var(--aa)}
+.sync-icon{font-size:22px;flex-shrink:0}
+.sync-info{flex:1}
+.sync-title{font-size:13px;font-weight:600;color:var(--t1);margin-bottom:2px}
+.sync-sub{font-size:11px;color:var(--t3);font-family:var(--mono)}
+.sync-acts{display:flex;gap:8px;flex-shrink:0}
+
+/* History list */
+.hc{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:16px 18px;display:flex;align-items:center;gap:14px;margin-bottom:9px;cursor:pointer;transition:all var(--ease);animation:fu .3s ease both}
+.hc:hover{border-color:var(--b2);box-shadow:0 4px 20px var(--sh);transform:translateY(-1px)}
+@keyframes fu{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.hc-ico{width:40px;height:40px;border-radius:10px;background:var(--red-a);border:1px solid rgba(220,38,38,.15);display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.hc-info{flex:1;min-width:0}
+.hc-name{font-size:13px;font-weight:600;color:var(--t1);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;margin-bottom:3px}
+.hc-meta{font-size:10px;color:var(--t3);font-family:var(--mono)}
+.hc-cloud{font-size:10px;color:var(--green);margin-top:2px}
+.hc-stats{display:flex;gap:14px;flex-shrink:0}
+.hs{text-align:center}
+.hs-v{font-family:var(--display);font-size:17px;font-weight:700;color:var(--red);line-height:1}
+.hs-v.g{color:var(--green)}.hs-v.dim{color:var(--t2);font-size:13px}
+.hs-l{font-size:8px;color:var(--t3);font-weight:600;text-transform:uppercase;letter-spacing:.08em;margin-top:2px}
+.hc-acts{display:flex;gap:5px;flex-shrink:0}
+.hbtn{padding:5px 11px;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all var(--ease);border:1px solid;background:transparent}
+.hbtn.xl{color:var(--green);border-color:rgba(34,197,94,.25)}.hbtn.xl:hover{background:var(--ga)}
+.hbtn.cv{color:var(--blue);border-color:rgba(59,130,246,.25)}.hbtn.cv:hover{background:var(--ba)}
+.hbtn.rm{color:var(--t3);border-color:var(--b)}.hbtn.rm:hover{color:var(--red);border-color:rgba(220,38,38,.3)}
+.cloud-tag{display:inline-flex;align-items:center;gap:4px;padding:1px 7px;border-radius:99px;font-size:9px;font-weight:600;font-family:var(--mono)}
+.cloud-tag.yes{background:var(--ga);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+.cloud-tag.no{background:var(--s3);color:var(--t3);border:1px solid var(--b)}
+
+/* ── ANALYTICS ── */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));gap:11px;margin-bottom:22px}
+.kpi{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:16px 18px;position:relative;overflow:hidden;transition:all var(--ease);cursor:default}
+.kpi::before{content:'';position:absolute;bottom:0;left:0;right:0;height:2px;background:var(--red)}
+.kpi.g::before{background:var(--green)}.kpi.a::before{background:var(--amber)}.kpi.b::before{background:var(--blue)}.kpi.pu::before{background:var(--purple)}
+.kpi:hover{box-shadow:0 4px 18px var(--sh);transform:translateY(-2px)}
+.kpi-v{font-family:var(--display);font-size:1.9rem;font-weight:700;color:var(--red);line-height:1;margin-bottom:4px}
+.kpi.g .kpi-v{color:var(--green)}.kpi.a .kpi-v{color:var(--amber)}.kpi.b .kpi-v{color:var(--blue)}.kpi.pu .kpi-v{color:var(--purple)}
+.kpi-l{font-size:9px;font-weight:700;color:var(--t3);text-transform:uppercase;letter-spacing:.1em}
+.kpi-sub{font-size:10px;color:var(--t3);margin-top:2px}
+
+.ch-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:18px}
+@media(max-width:900px){.ch-grid{grid-template-columns:1fr}}
+.ch-card{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:18px;transition:all var(--ease)}
+.ch-card:hover{box-shadow:0 4px 18px var(--sh)}
+.ch-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:3px}
+.ch-title{font-size:12px;font-weight:600;color:var(--t1)}
+.ch-sub{font-size:10px;color:var(--t3);margin-bottom:14px;font-family:var(--mono)}
+.ch-wrap{position:relative;height:200px}
+.live-dot{width:7px;height:7px;border-radius:50%;background:var(--green);box-shadow:0 0 0 2px var(--ga);animation:pulse-d 1.5s infinite}
+
+/* ── SETTINGS ── */
+.set-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+@media(max-width:800px){.set-grid{grid-template-columns:1fr}}
+.set-card{background:var(--s);border:1px solid var(--b);border-radius:12px;padding:22px;transition:all var(--ease)}
+.set-title{font-size:13px;font-weight:700;color:var(--t1);margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.set-row{margin-bottom:16px}
+.set-row:last-child{margin-bottom:0}
+.set-lbl{font-size:11px;font-weight:600;color:var(--t2);margin-bottom:4px;display:flex;align-items:center;justify-content:space-between}
+.set-desc{font-size:10px;color:var(--t3);margin-top:3px;line-height:1.6}
+.set-inp{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t1);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;transition:all var(--ease)}
+.set-inp:focus{border-color:var(--red)}
+.set-sel{width:100%;background:var(--s2);border:1px solid var(--b);border-radius:8px;color:var(--t1);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;cursor:pointer}
+.set-sel:focus{border-color:var(--red)}
+.tog-row{display:flex;align-items:center;justify-content:space-between}
+.tog{width:44px;height:24px;border-radius:99px;background:var(--s3);border:1px solid var(--b);cursor:pointer;position:relative;transition:all .3s}
+.tog.on{background:var(--red);border-color:var(--red)}
+.tog::after{content:'';position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:#fff;transition:transform .3s cubic-bezier(.34,1.56,.64,1);box-shadow:0 1px 3px rgba(0,0,0,.2)}
+.tog.on::after{transform:translateX(20px)}
+.warn-card{background:var(--aa);border:1px solid rgba(245,158,11,.2);border-radius:10px;padding:13px 15px;margin-top:14px;font-size:11px;color:var(--amber);line-height:1.8}
+.warn-card strong{color:var(--t1)}
+.save-btn{width:100%;margin-top:14px;padding:11px;border-radius:8px;background:var(--red);color:#fff;border:none;font-family:var(--ff);font-weight:700;font-size:13px;cursor:pointer;transition:all var(--ease)}
+.save-btn:hover{background:var(--red-l);box-shadow:0 4px 14px var(--red-g);transform:translateY(-1px)}
+
+/* Supabase card special */
+.sb-card{border-color:rgba(34,197,94,.3)!important;background:var(--ga)!important}
+.sb-card .set-title{color:var(--green)}
+.sb-card .set-inp:focus{border-color:var(--green)}
+.sb-card .save-btn{background:var(--green)!important}
+.sb-card .save-btn:hover{background:#16a34a!important;box-shadow:0 4px 14px rgba(34,197,94,.3)!important}
+
+/* ── TOASTS / MODAL ── */
+.toasts{position:fixed;top:68px;right:18px;z-index:9000;display:flex;flex-direction:column;gap:7px}
+.toast{display:flex;align-items:center;gap:9px;background:var(--s);border:1px solid var(--b);border-radius:10px;padding:11px 14px;min-width:240px;max-width:320px;box-shadow:0 8px 28px var(--sh);animation:t-in .3s ease;font-size:12px;font-weight:500;color:var(--t1)}
+@keyframes t-in{from{opacity:0;transform:translateX(14px)}to{opacity:1;transform:none}}
+.toast.out{animation:t-out .25s ease forwards}
+@keyframes t-out{to{opacity:0;transform:translateX(14px)}}
+.toast.ok{border-left:3px solid var(--green)}.toast.warn{border-left:3px solid var(--amber)}.toast.err{border-left:3px solid var(--red)}.toast.info{border-left:3px solid var(--blue)}
+
+.modal-ov{position:fixed;inset:0;z-index:8000;background:rgba(0,0,0,.5);backdrop-filter:blur(6px);display:flex;align-items:center;justify-content:center;animation:fade-in .2s ease}
+.modal{background:var(--s);border:1px solid var(--b2);border-radius:16px;padding:26px;width:400px;max-width:90vw;box-shadow:0 24px 60px var(--sh);animation:slide-up .25s ease;transition:all var(--ease)}
+.modal-t{font-family:var(--display);font-size:19px;font-weight:700;color:var(--t1);margin-bottom:3px}
+.modal-s{font-size:11px;color:var(--t3);margin-bottom:14px;font-family:var(--mono)}
+.modal-b{font-size:13px;color:var(--t2);line-height:1.7}
+.modal-acts{display:flex;gap:8px;margin-top:18px;justify-content:flex-end}
+.mbtn{padding:8px 16px;border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;transition:all var(--ease);border:1px solid;background:transparent}
+.mbtn.cancel{color:var(--t2);border-color:var(--b)}.mbtn.cancel:hover{background:var(--s2)}
+.mbtn.danger{background:var(--red);color:#fff;border-color:var(--red)}.mbtn.danger:hover{background:var(--red-l)}
+</style>
+</head>
+<body>
+
+<!-- ═══ SUPABASE SETUP WIZARD ═══ -->
+<div id="sb-overlay" style="display:none">
+  <div class="sb-wizard">
+    <div class="wiz-logo">
+      <div class="wiz-lm">L</div>
+      <div class="wiz-ln">Linked<span>Scan</span></div>
+    </div>
+
+    <!-- Step 1 -->
+    <div class="wiz-step active" id="wiz-1">
+      <div class="step-pills"><div class="sp done" id="sp1"></div><div class="sp" id="sp2"></div><div class="sp" id="sp3"></div></div>
+      <div class="wiz-title">Welcome to LinkedScan</div>
+      <div class="wiz-sub">// Set up cloud history so your scrape results are saved permanently and accessible from any device.</div>
+      <div class="hint-box">
+        <strong>How it works:</strong>
+        <ul>
+          <li>Your browser gets a unique <code>Device ID</code> saved locally</li>
+          <li>Every completed job is synced to <strong>Supabase</strong> (free cloud database)</li>
+          <li>Return to this site on any browser → paste your Device ID → full history restored</li>
+          <li>No account or login required</li>
+        </ul>
+      </div>
+      <div class="wiz-actions">
+        <span class="skip-link" onclick="skipWizard()">Skip for now (use local only)</span>
+        <button class="wiz-btn primary" onclick="wizNext(2)">Get Started →</button>
+      </div>
+    </div>
+
+    <!-- Step 2 -->
+    <div class="wiz-step" id="wiz-2">
+      <div class="step-pills"><div class="sp done" id="sp1b"></div><div class="sp done" id="sp2b"></div><div class="sp" id="sp3b"></div></div>
+      <div class="wiz-title">Create your Supabase project</div>
+      <div class="wiz-sub">// Supabase is free and takes 2 minutes to set up.</div>
+      <div class="hint-box">
+        <strong>Steps:</strong>
+        <ol>
+          <li>Go to <strong>supabase.com</strong> → Sign up (free)</li>
+          <li>Create a new project (any name, any region)</li>
+          <li>Open <strong>SQL Editor</strong> → paste contents of <code>supabase_setup.sql</code> → Run</li>
+          <li>Go to <strong>Settings → API</strong></li>
+          <li>Copy your <strong>Project URL</strong> and <strong>anon/public key</strong></li>
+        </ol>
+      </div>
+      <div class="wiz-actions">
+        <button class="wiz-btn secondary" onclick="wizNext(1)">← Back</button>
+        <a class="wiz-btn primary" href="https://supabase.com" target="_blank" onclick="setTimeout(()=>wizNext(3),500)">Open Supabase →</a>
+      </div>
+    </div>
+
+    <!-- Step 3 -->
+    <div class="wiz-step" id="wiz-3">
+      <div class="step-pills"><div class="sp done"></div><div class="sp done"></div><div class="sp done" id="sp3c"></div></div>
+      <div class="wiz-title">Connect your project</div>
+      <div class="wiz-sub">// Paste your Supabase credentials below.</div>
+      <div class="wiz-field">
+        <div class="wiz-label">Project URL <span style="color:var(--t3);font-size:10px">from Settings → API</span></div>
+        <input class="wiz-input" type="url" id="wiz-url" placeholder="https://xxxxxx.supabase.co" oninput="clearSbStatus()"/>
+      </div>
+      <div class="wiz-field">
+        <div class="wiz-label">Anon / Public Key <span style="color:var(--t3);font-size:10px">anon key (not service_role)</span></div>
+        <input class="wiz-input" type="text" id="wiz-key" placeholder="eyJhbGci…" oninput="clearSbStatus()"/>
+      </div>
+      <div id="wiz-status"></div>
+      <div class="wiz-actions">
+        <button class="wiz-btn secondary" onclick="wizNext(2)">← Back</button>
+        <button class="wiz-btn primary" id="wiz-test-btn" onclick="testAndSave()">Test &amp; Connect</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toasts" id="toasts"></div>
+<div class="modal-ov" id="stop-modal" style="display:none">
+  <div class="modal">
+    <div class="modal-t">Stop this job?</div>
+    <div class="modal-s">// PARTIAL RESULTS WILL BE PRESERVED</div>
+    <div class="modal-b">Scraping will stop immediately. Completed results can still be downloaded.</div>
+    <div class="modal-acts">
+      <button class="mbtn cancel" onclick="closeModal()">Cancel</button>
+      <button class="mbtn danger" id="modal-ok">Stop Job</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ HEADER ═══ -->
+<div id="hdr">
+  <div class="hdr-wrap">
+    <div class="logo">
+      <div class="logo-m">L</div>
+      <div>
+        <div class="logo-n">Linked<span>Scan</span></div>
+        <span class="logo-v">People Intelligence</span>
+      </div>
+    </div>
+    <nav class="nav">
+      <button class="nt active" onclick="goPage('scraper',this)">🔍 Scraper</button>
+      <button class="nt" onclick="goPage('history',this)">📂 History <span class="badge" id="hbadge" style="display:none">0</span></button>
+      <button class="nt" onclick="goPage('analytics',this)">📊 Analytics</button>
+      <button class="nt" onclick="goPage('settings',this)">⚙️ Settings</button>
+    </nav>
+    <div class="hdr-r">
+      <div class="cloud-pill" onclick="goPage('settings',document.querySelectorAll('.nt')[3])" id="cloud-pill-hdr">
+        <div class="cloud-dot disconnected" id="cloud-hdr-dot"></div>
+        <span id="cloud-hdr-txt">Local only</span>
+      </div>
+      <div class="clock" id="clock">--:--:--</div>
+      <div class="theme-tog" onclick="toggleTheme()">
+        <div class="theme-icons"><span>🌙</span><span>☀️</span></div>
+        <div class="theme-thumb"></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════ SCRAPER ══════════════════════ -->
+<div class="page active" id="page-scraper">
+<div class="scraper-layout">
+  <aside class="sidebar">
+    <div class="sb-sec">
+      <div class="sb-lbl">LinkedIn Auth</div>
+      <div class="field">
+        <label class="f-label">Email</label>
+        <div class="f-wrap"><input class="f-input" type="email" id="li-email" placeholder="you@example.com" oninput="chkCreds()"/><span class="f-ico">✉</span></div>
+      </div>
+      <div class="field">
+        <label class="f-label">Password</label>
+        <div class="f-wrap"><input class="f-input" type="password" id="li-pass" placeholder="••••••••" oninput="chkCreds()"/><span class="f-ico" id="eye" onclick="toggleEye()">👁</span></div>
+      </div>
+      <div class="cred-ok" id="cred-ok">Enter credentials to begin</div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Upload Files</div>
+      <div class="dz" id="dz">
+        <input type="file" id="fi" accept=".csv,.xlsx,.xls" multiple onchange="onFiles(event)"/>
+        <span class="dz-i">📂</span>
+        <div class="dz-t">Drop files here</div>
+        <div class="dz-s">CSV or Excel · multiple files OK</div>
+        <div class="dz-fn" id="dz-fn"></div>
+        <div class="fmt-row"><span class="fmt">CSV</span><span class="fmt">XLSX</span><span class="fmt">XLS</span></div>
+      </div>
+      <div style="margin-top:8px;font-size:10px;color:var(--t3);line-height:1.7;font-family:var(--mono)">Column: <code style="color:var(--red)">linkedin_url</code>, <code style="color:var(--red)">url</code>, or first column.</div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Job Queue</div>
+      <div id="queue-list"><div class="q-empty">No jobs queued</div></div>
+    </div>
+
+    <div class="sb-sec">
+      <div class="sb-lbl">Session Stats</div>
+      <div class="mkpi-grid">
+        <div class="mkpi"><div class="mkpi-v" id="ss-t">0</div><div class="mkpi-l">Total</div></div>
+        <div class="mkpi"><div class="mkpi-v" id="ss-d">0</div><div class="mkpi-l">Done</div></div>
+        <div class="mkpi"><div class="mkpi-v g" id="ss-f">0</div><div class="mkpi-l">Found</div></div>
+        <div class="mkpi"><div class="mkpi-v dim" id="ss-n">0</div><div class="mkpi-l">N/A</div></div>
+      </div>
+      <div class="cloud-badge" id="cloud-sb-badge" onclick="goPage('settings',document.querySelectorAll('.nt')[3])">
+        <span id="cloud-sb-ico">☁️</span>
+        <span id="cloud-sb-txt">Cloud sync not configured</span>
+      </div>
+    </div>
+  </aside>
+
+  <div class="main-col">
+    <div class="tb">
+      <div class="tb-g">
+        <button class="btn p" id="btn-start" onclick="startJob()" disabled>
+          <svg viewBox="0 0 16 16" fill="currentColor"><path d="M3 2l10 6-10 6z"/></svg>Start
+        </button>
+        <button class="btn a" id="btn-pause" onclick="pauseJob()" disabled>
+          <svg viewBox="0 0 16 16" fill="currentColor"><rect x="3" y="2" width="4" height="12"/><rect x="9" y="2" width="4" height="12"/></svg>Pause
+        </button>
+        <button class="btn d" id="btn-stop" onclick="openStopModal()" disabled>
+          <svg viewBox="0 0 16 16" fill="currentColor"><rect x="2" y="2" width="12" height="12" rx="2"/></svg>Stop
+        </button>
+      </div>
+      <div class="tb-sep"></div>
+      <div class="tb-g">
+        <span style="font-size:11px;color:var(--t3);font-weight:500">Speed</span>
+        <select class="tb-sel" id="speed-sel">
+          <option value="3000">Slow · 3s</option>
+          <option value="1500" selected>Normal · 1.5s</option>
+          <option value="800">Fast · 0.8s</option>
+        </select>
+      </div>
+      <div class="tb-sep"></div>
+      <button class="btn o" onclick="clearAll()">
+        <svg viewBox="0 0 16 16" stroke="currentColor" stroke-width="1.4" fill="none" stroke-linecap="round" width="12" height="12"><path d="M3 4h10M6 4V2h4v2M5 4v9h6V4"/></svg>Clear
+      </button>
+      <div class="st-pill">
+        <div class="spdot" id="sp-dot"></div>
+        <span id="sp-txt">Idle</span>
+      </div>
+      <div class="done-badge" id="done-badge">✅ Done in <span id="done-time">0s</span></div>
+      <div class="tb-g" style="margin-left:6px">
+        <button class="btn s" id="btn-xl" onclick="dlActive('xlsx')" disabled>📊 Excel</button>
+        <button class="btn o" id="btn-csv" onclick="dlActive('csv')" disabled>📄 CSV</button>
+      </div>
+    </div>
+
+    <div class="pz">
+      <div class="pz-top">
+        <div class="pz-lbl">Progress — <strong id="pz-f">0 / 0</strong></div>
+        <div class="pz-pct" id="pz-p">0%</div>
+      </div>
+      <div class="pz-track"><div class="pz-fill" id="pz-bar"></div></div>
+      <div class="stats-strip">
+        <div class="st"><span class="st-v r" id="st-p">0</span><span class="st-k">Processed</span></div>
+        <div class="st"><span class="st-v g" id="st-f">0</span><span class="st-k">Found</span></div>
+        <div class="st"><span class="st-v" style="color:var(--red-d)" id="st-n">0</span><span class="st-k">N/A</span></div>
+        <div class="st"><span class="st-v dim" id="st-r">0</span><span class="st-k">Remaining</span></div>
+        <div class="st"><span class="st-v dim" id="st-e">--:--</span><span class="st-k">ETA</span></div>
+        <div class="st"><span class="st-v dim" id="st-a">--</span><span class="st-k">Avg/row</span></div>
+        <div class="st"><span class="st-v dim" id="st-el">0s</span><span class="st-k">Elapsed</span></div>
+      </div>
+    </div>
+
+    <div class="rz">
+      <div class="rt">
+        <span class="rt-title">Live Results</span>
+        <span class="rt-cnt" id="rt-cnt">0 rows</span>
+        <input class="rt-search" type="text" placeholder="Search…" id="rt-s" oninput="filterTbl(this.value)"/>
+        <select class="rt-sel" id="range-sel" onchange="filterTbl(document.getElementById('rt-s').value)">
+          <option value="">All ranges</option>
+          <option value="0">0–20</option>
+          <option value="1">21–50</option>
+          <option value="2">51–100</option>
+          <option value="3">101–500</option>
+          <option value="4">501–1K</option>
+          <option value="5">1K–5K</option>
+          <option value="6">5K–10K</option>
+          <option value="7">10K+</option>
+        </select>
+        <button class="btn o" style="height:28px;font-size:11px;padding:0 9px" onclick="exportFiltered()">Export filtered</button>
+      </div>
+      <div class="empty" id="empty-s">
+        <div class="empty-i">🔍</div>
+        <div class="empty-h">No data yet</div>
+        <div class="empty-p">Enter credentials → upload file → press <strong style="color:var(--red)">Start</strong></div>
+      </div>
+      <div class="tbl-wrap" id="tbl-wrap" style="display:none">
+        <table><thead id="tbl-head"></thead><tbody id="tbl-body"></tbody></table>
+      </div>
+    </div>
+
+    <div class="term">
+      <div class="term-hdr">
+        <div class="term-dots"><div class="td r"></div><div class="td y"></div><div class="td g"></div></div>
+        <span class="term-lbl">System Log</span>
+        <span style="font-family:var(--mono);font-size:9px;color:var(--t3)" id="device-id-lbl"></span>
+      </div>
+      <div class="term-body" id="term"></div>
+    </div>
+  </div>
+</div>
+</div>
+
+<!-- ══════════════════════ HISTORY ══════════════════════ -->
+<div class="page" id="page-history">
+<div class="page-wrap">
+  <div class="ph">
+    <div class="ph-h">Job <span>History</span></div>
+    <div class="ph-s">// results saved to cloud · accessible from any device</div>
+  </div>
+  <div id="sync-banner-wrap"></div>
+  <div id="hist-content"><div style="text-align:center;padding:60px;color:var(--t3);font-size:13px">Loading…</div></div>
+</div>
+</div>
+
+<!-- ══════════════════════ ANALYTICS ══════════════════════ -->
+<div class="page" id="page-analytics">
+<div class="page-wrap">
+  <div class="ph" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+    <div>
+      <div class="ph-h">Analytics <span>&amp; Insights</span></div>
+      <div class="ph-s">// real-time · updates every 3s</div>
+    </div>
+    <div style="display:flex;align-items:center;gap:6px">
+      <div class="live-dot"></div>
+      <span style="font-size:11px;color:var(--green);font-weight:600">Live</span>
+    </div>
+  </div>
+  <div id="an-content"><div style="text-align:center;padding:60px;color:var(--t3);font-size:13px">Loading…</div></div>
+</div>
+</div>
+
+<!-- ══════════════════════ SETTINGS ══════════════════════ -->
+<div class="page" id="page-settings">
+<div class="page-wrap">
+  <div class="ph">
+    <div class="ph-h">Settings <span>&amp; Config</span></div>
+    <div class="ph-s">// scraper · anti-detection · cloud sync</div>
+  </div>
+  <div id="set-content"><div style="text-align:center;padding:60px;color:var(--t3);font-size:13px">Loading…</div></div>
+</div>
+</div>
+
+<script>
+// ═══════════════════════════════════════════════
+//  SUPABASE CLIENT
+// ═══════════════════════════════════════════════
+let sbClient = null;
+
+function initSupabase(url, key) {
+  try {
+    sbClient = window.supabase.createClient(url, key);
+    return true;
+  } catch(e) {
+    sbClient = null;
+    return false;
+  }
+}
+
+function loadSbConfig() {
+  const url = localStorage.getItem('sb-url');
+  const key = localStorage.getItem('sb-key');
+  if (url && key) initSupabase(url, key);
+}
+loadSbConfig();
+
+function sbConnected() { return sbClient !== null && !!localStorage.getItem('sb-url'); }
+
+// ═══════════════════════════════════════════════
+//  DEVICE ID — permanent anonymous identifier
+// ═══════════════════════════════════════════════
+function getDeviceId() {
+  let id = localStorage.getItem('ls-device-id');
+  if (!id) {
+    id = 'dev_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,9);
+    localStorage.setItem('ls-device-id', id);
+  }
+  return id;
+}
+const DEVICE_ID = getDeviceId();
+
+// Show device ID in terminal header (so user can copy it)
+document.getElementById('device-id-lbl').textContent = 'ID: ' + DEVICE_ID;
+
+// ═══════════════════════════════════════════════
+//  THEME
+// ═══════════════════════════════════════════════
+function toggleTheme() {
+  const h = document.documentElement;
+  const t = h.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+  h.setAttribute('data-theme', t);
+  localStorage.setItem('ls-theme', t);
+  Object.values(anCharts).forEach(c => { try { updateChartTheme(c); } catch(e){} });
+}
+(()=>{ const t=localStorage.getItem('ls-theme')||'dark'; document.documentElement.setAttribute('data-theme',t); })();
+
+// ═══════════════════════════════════════════════
+//  CLOCK + ELAPSED
+// ═══════════════════════════════════════════════
+setInterval(()=>document.getElementById('clock').textContent=new Date().toTimeString().slice(0,8),1000);
+let startMs=null, elTimer=null;
+function startElapsed(){ startMs=Date.now(); if(elTimer)clearInterval(elTimer); elTimer=setInterval(()=>{ if(!startMs)return; const s=Math.floor((Date.now()-startMs)/1000); document.getElementById('st-el').textContent=(s>=60?Math.floor(s/60)+'m ':'')+(s%60)+'s'; },1000); }
+function stopElapsed(){ if(elTimer)clearInterval(elTimer); if(!startMs)return; const s=Math.floor((Date.now()-startMs)/1000); const txt=(s>=60?Math.floor(s/60)+'m ':'')+s%60+'s'; document.getElementById('done-time').textContent=txt; document.getElementById('done-badge').classList.add('show'); startMs=null; }
+
+// ═══════════════════════════════════════════════
+//  RANGE HELPERS
+// ═══════════════════════════════════════════════
+const RANGES=[
+  {label:'0–20',min:0,max:20,cls:'rb-0'},
+  {label:'21–50',min:21,max:50,cls:'rb-1'},
+  {label:'51–100',min:51,max:100,cls:'rb-2'},
+  {label:'101–500',min:101,max:500,cls:'rb-3'},
+  {label:'501–1K',min:501,max:1000,cls:'rb-4'},
+  {label:'1K–5K',min:1001,max:5000,cls:'rb-5'},
+  {label:'5K–10K',min:5001,max:10000,cls:'rb-6'},
+  {label:'10K+',min:10001,max:Infinity,cls:'rb-7'},
+];
+function getRangeIdx(cnt){ const n=parseInt(cnt); if(isNaN(n))return -1; return RANGES.findIndex(r=>n>=r.min&&n<=r.max); }
+function getRangeLabel(cnt){ const i=getRangeIdx(cnt); return i>=0?RANGES[i].label:'—'; }
+function getRangeCls(cnt){ const i=getRangeIdx(cnt); return i>=0?RANGES[i].cls:''; }
+function inRange(cnt,ri){ if(ri===''||ri===null||ri===undefined)return true; const n=parseInt(cnt),r=RANGES[parseInt(ri)]; return r&&!isNaN(n)&&n>=r.min&&n<=r.max; }
+
+// ═══════════════════════════════════════════════
+//  WIZARD
+// ═══════════════════════════════════════════════
+function showWizard(){ document.getElementById('sb-overlay').style.display='flex'; }
+function hideWizard(){ document.getElementById('sb-overlay').style.display='none'; }
+function wizNext(n){ [1,2,3].forEach(i=>{ const el=document.getElementById('wiz-'+i); if(el)el.classList.toggle('active',i===n); }); }
+function skipWizard(){ hideWizard(); localStorage.setItem('ls-wizard-done','1'); updateCloudUI(); }
+function clearSbStatus(){ document.getElementById('wiz-status').innerHTML=''; }
+
+// Show wizard on first visit
+if(!localStorage.getItem('ls-wizard-done')){ setTimeout(showWizard, 600); }
+updateCloudUI();
+
+async function testAndSave() {
+  const url = document.getElementById('wiz-url').value.trim();
+  const key = document.getElementById('wiz-key').value.trim();
+  const btn = document.getElementById('wiz-test-btn');
+  const st  = document.getElementById('wiz-status');
+  if(!url||!key){ st.innerHTML='<div class="sb-status err">⚠ Please fill in both fields.</div>'; return; }
+  st.innerHTML='<div class="sb-status testing">⏳ Testing connection…</div>';
+  btn.disabled = true;
+  try {
+    const client = window.supabase.createClient(url, key);
+    const { error } = await client.from('job_history').select('id').limit(1);
+    if(error && error.code !== 'PGRST116') throw error;
+    // Save
+    localStorage.setItem('sb-url', url);
+    localStorage.setItem('sb-key', key);
+    localStorage.setItem('ls-wizard-done','1');
+    initSupabase(url, key);
+    st.innerHTML='<div class="sb-status ok">✅ Connected! Your history will now sync to the cloud.</div>';
+    log('Supabase connected — cloud sync active','ok');
+    toast('Cloud sync connected!','ok');
+    setTimeout(()=>{ hideWizard(); updateCloudUI(); },1800);
+  } catch(e) {
+    st.innerHTML=`<div class="sb-status err">❌ Connection failed: ${e.message||'Check URL and key'}.<br>Make sure you ran supabase_setup.sql in your project.</div>`;
+    log('Supabase connection failed: '+e.message,'err');
+  }
+  btn.disabled = false;
+}
+
+function updateCloudUI() {
+  const ok = sbConnected();
+  // Header pill
+  document.getElementById('cloud-hdr-dot').className = 'cloud-dot '+(ok?'connected':'disconnected');
+  document.getElementById('cloud-hdr-txt').textContent = ok?'Cloud synced':'Local only';
+  // Sidebar badge
+  const badge = document.getElementById('cloud-sb-badge');
+  badge.className = 'cloud-badge '+(ok?'ok':'warn');
+  document.getElementById('cloud-sb-ico').textContent = ok?'☁️':'⚠️';
+  document.getElementById('cloud-sb-txt').textContent = ok?'Cloud sync active — history saved':'Cloud sync not configured';
+}
+
+// ═══════════════════════════════════════════════
+//  PAGE NAV
+// ═══════════════════════════════════════════════
+function goPage(id,btn){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nt').forEach(b=>b.classList.remove('active'));
+  document.getElementById('page-'+id).classList.add('active');
+  btn.classList.add('active');
+  if(id==='history')  loadHistory();
+  if(id==='analytics')loadAnalytics();
+  if(id==='settings') loadSettings();
+}
+
+// ═══════════════════════════════════════════════
+//  TOAST + LOG
+// ═══════════════════════════════════════════════
+function toast(msg,type='info'){
+  const ic={ok:'✅',warn:'⚠️',err:'❌',info:'ℹ️'};
+  const c=document.getElementById('toasts');
+  const el=document.createElement('div'); el.className='toast '+type;
+  el.innerHTML=`<span style="font-size:14px">${ic[type]}</span><span>${msg}</span>`;
+  c.appendChild(el);
+  setTimeout(()=>{el.classList.add('out');setTimeout(()=>el.remove(),280)},3500);
+}
+function log(msg,type='info'){
+  const b=document.getElementById('term');
+  const ts=new Date().toTimeString().slice(0,8);
+  const el=document.createElement('div'); el.className='log-r';
+  el.innerHTML=`<span class="log-ts">[${ts}]</span><span class="log-m ${type}">${msg}</span>`;
+  b.appendChild(el); b.scrollTop=b.scrollHeight;
+  if(b.children.length>300) b.removeChild(b.firstChild);
+}
+
+// ═══════════════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════════════
+const S={activeJid:null,jobs:{},rows:[],cols:[],sT:0,sD:0,sF:0,sN:0};
+const pollTimers={};
+
+// ═══════════════════════════════════════════════
+//  CREDS
+// ═══════════════════════════════════════════════
+function chkCreds(){
+  const e=document.getElementById('li-email').value.trim();
+  const p=document.getElementById('li-pass').value.trim();
+  const el=document.getElementById('cred-ok');
+  if(e&&p){el.className='cred-ok valid';el.textContent='✓ Ready'}
+  else{el.className='cred-ok';el.textContent='Enter credentials to begin'}
+  updateStartBtn();
+}
+function toggleEye(){
+  const i=document.getElementById('li-pass'),ic=document.getElementById('eye');
+  i.type=i.type==='password'?'text':'password'; ic.textContent=i.type==='password'?'👁':'🙈';
+}
+
+// ═══════════════════════════════════════════════
+//  FILES
+// ═══════════════════════════════════════════════
+const dz=document.getElementById('dz');
+dz.addEventListener('dragover',e=>{e.preventDefault();dz.classList.add('over')});
+dz.addEventListener('dragleave',()=>dz.classList.remove('over'));
+dz.addEventListener('drop',e=>{e.preventDefault();dz.classList.remove('over');if(e.dataTransfer.files.length)handleFiles(e.dataTransfer.files)});
+function onFiles(e){if(e.target.files.length)handleFiles(e.target.files)}
+
+function handleFiles(files){
+  const arr=Array.from(files);
+  document.getElementById('dz-fn').textContent='✓ '+arr.map(f=>f.name).join(', ');
+  const csv=arr.find(f=>f.name.toLowerCase().endsWith('.csv'));
+  if(csv){
+    const r=new FileReader();
+    r.onload=ev=>{
+      const lines=ev.target.result.trim().split('\n').filter(Boolean);
+      if(!lines.length)return;
+      const cols=lines[0].split(',').map(s=>s.trim().replace(/^"|"$/g,''));
+      const rows=lines.slice(1).map(line=>{const vals=csvLine(line);const o={};cols.forEach((c,i)=>o[c]=vals[i]||'');return o});
+      S.rows=rows; S.cols=cols; S.sT+=rows.length; updateSS(); renderTable(); updateStartBtn();
+      log(`Loaded ${rows.length} rows from ${csv.name}`,'sys');
+    };
+    r.readAsText(csv);
+  } else {
+    S.rows=[{linkedin_url:''}]; S.cols=['linkedin_url'];
+    renderTable(); updateStartBtn();
+    log(`${arr.length} Excel file(s) — parsed on server`,'warn');
+  }
+  toast(`${arr.length} file(s) ready`,'ok');
+}
+function csvLine(line){const res=[];let cur='',inQ=false;for(let i=0;i<line.length;i++){if(line[i]==='"'){inQ=!inQ}else if(line[i]===','&&!inQ){res.push(cur.trim());cur=''}else cur+=line[i]}res.push(cur.trim());return res}
+
+// ═══════════════════════════════════════════════
+//  START
+// ═══════════════════════════════════════════════
+function updateStartBtn(){
+  const e=document.getElementById('li-email').value.trim();
+  const p=document.getElementById('li-pass').value.trim();
+  const hasFile=document.getElementById('fi').files.length>0;
+  const idle=!S.activeJid||['done','stopped','error'].includes((S.jobs[S.activeJid]||{}).status);
+  document.getElementById('btn-start').disabled=!(e&&p&&hasFile&&idle);
+}
+
+async function startJob(){
+  const email=document.getElementById('li-email').value.trim();
+  const pass=document.getElementById('li-pass').value.trim();
+  const files=document.getElementById('fi').files;
+  if(!email||!pass){toast('Enter credentials','warn');return}
+  if(!files.length){toast('Upload a file','warn');return}
+  document.getElementById('done-badge').classList.remove('show');
+  for(const f of Array.from(files)) await uploadFile(f,email,pass);
+  document.getElementById('fi').value='';
+  document.getElementById('dz-fn').textContent='';
+  updateStartBtn();
+}
+
+async function uploadFile(file,email,pass){
+  const fd=new FormData();
+  fd.append('file',file); fd.append('email',email); fd.append('password',pass);
+  fd.append('device_id',DEVICE_ID);
+  log(`Uploading ${file.name}…`,'info');
+  try{
+    const res=await fetch('/upload',{method:'POST',body:fd});
+    const data=await res.json();
+    if(!res.ok){log('Upload error: '+data.error,'err');toast(data.error,'err');return}
+    initJobState(data.job_id,file.name,data.total);
+    startElapsed(); startPoll(data.job_id);
+    log(`Job started · ${data.total} rows`,'ok'); toast('Scraping '+file.name,'ok');
+  }catch(err){
+    // Demo mode
+    const jid='demo-'+Date.now();
+    initJobState(jid,file.name,S.rows.length||8);
+    startElapsed(); runDemo(jid);
+    log('Demo mode active','warn'); toast('Demo simulation','warn');
+  }
+}
+
+function initJobState(jid,fname,total){
+  S.jobs[jid]={id:jid,filename:fname,status:'running',progress:0,total,found:0,failed:0,results:[],cols:S.cols,startMs:Date.now(),timings:[]};
+  S.activeJid=jid;
+  addQItem(jid,fname,total);
+  setPill('running','Running…');
+  document.getElementById('btn-pause').disabled=false;
+  document.getElementById('btn-stop').disabled=false;
+  document.getElementById('btn-xl').disabled=false;
+  document.getElementById('btn-csv').disabled=false;
+  document.getElementById('pz-bar').className='pz-fill';
+}
+
+// Poll
+function startPoll(jid){ pollTimers[jid]=setInterval(()=>pollJob(jid),2200) }
+async function pollJob(jid){
+  try{
+    const[sr,pr]=await Promise.all([fetch('/status/'+jid),fetch('/partial/'+jid)]);
+    const sd=await sr.json(); const pd=await pr.json();
+    const job=S.jobs[jid];
+    Object.assign(job,{status:sd.status,progress:sd.progress,found:sd.found||0,failed:sd.failed||0});
+    if(pd.results)job.results=pd.results;
+    if(pd.columns)job.cols=pd.columns;
+    updateProg(job); updateQItem(jid,job);
+    if(jid===S.activeJid)renderTable();
+    if(sd.status==='done'){clearInterval(pollTimers[jid]);onDone(jid)}
+    else if(sd.status==='error'){clearInterval(pollTimers[jid]);onError(jid,sd.error)}
+    else if(sd.status==='stopped'){clearInterval(pollTimers[jid]);setPill('stopped','Stopped')}
+  }catch(e){}
+}
+
+// Demo
+const DEMO=[
+  {c:'Google',u:'https://www.linkedin.com/company/google/',n:'196543'},
+  {c:'Microsoft',u:'https://www.linkedin.com/company/microsoft/',n:'224810'},
+  {c:'Apple',u:'https://www.linkedin.com/company/apple/',n:'45'},
+  {c:'Amazon',u:'https://www.linkedin.com/company/amazon/',n:'387210'},
+  {c:'Meta',u:'https://www.linkedin.com/company/meta/',n:'84091'},
+  {c:'Tesla',u:'https://www.linkedin.com/company/tesla-motors/',n:'12'},
+  {c:'Netflix',u:'https://www.linkedin.com/company/netflix/',n:'38217'},
+  {c:'Airbnb',u:'https://www.linkedin.com/company/airbnb/',n:'8500'},
+];
+function runDemo(jid){
+  const job=S.jobs[jid]; let idx=0;
+  const speed=parseInt(document.getElementById('speed-sel').value)||1500;
+  job.status='running'; setPill('running','Running…');
+  function next(){
+    if(job.status==='stopped')return;
+    if(job.status==='paused'){setTimeout(next,400);return}
+    if(idx>=job.total){job.status='done';onDone(jid);return}
+    const src=DEMO[idx%DEMO.length];
+    const row=S.rows[idx]||{company_name:src.c,linkedin_url:src.u};
+    const ok=Math.random()>.12; const cnt=ok?src.n:'N/A';
+    const t=parseFloat((speed/1000+Math.random()*.5).toFixed(2));
+    row.associated_members=cnt; row._status=ok?'done':'na'; row._time_s=t;
+    job.results.push({...row}); job.timings.push(t);
+    if(ok)job.found++; else job.failed++;
+    job.progress=++idx; updateProg(job); updateQItem(jid,job);
+    if(jid===S.activeJid)renderTable();
+    log((ok?'✓':'✕')+' '+src.c+' → '+(ok?Number(cnt).toLocaleString()+' members':'N/A'),(ok?'ok':'warn'));
+    setTimeout(next,speed+Math.random()*300);
+  }
+  next();
+}
+
+// ═══════════════════════════════════════════════
+//  PROGRESS
+// ═══════════════════════════════════════════════
+function updateProg(job){
+  const pct=job.total?Math.round(job.progress/job.total*100):0;
+  document.getElementById('pz-bar').style.width=pct+'%';
+  document.getElementById('pz-p').textContent=pct+'%';
+  document.getElementById('pz-f').textContent=job.progress+' / '+job.total;
+  document.getElementById('st-p').textContent=job.progress;
+  document.getElementById('st-f').textContent=job.found||0;
+  document.getElementById('st-n').textContent=job.failed||0;
+  document.getElementById('st-r').textContent=Math.max(0,job.total-job.progress);
+  S.sD=job.progress; S.sF=job.found||0; S.sN=job.failed||0; updateSS();
+  const timings=job.timings||[];
+  if(timings.length){
+    const avg=timings.reduce((a,b)=>a+b,0)/timings.length;
+    document.getElementById('st-a').textContent=avg.toFixed(1)+'s';
+    const rem=Math.max(0,job.total-job.progress);
+    const etaS=Math.round(avg*rem/Math.max(1,parseInt(localStorage.getItem('ls-workers')||'2')));
+    document.getElementById('st-e').textContent=Math.floor(etaS/60)+':'+String(etaS%60).padStart(2,'0');
+  }
+  const bar=document.getElementById('pz-bar');
+  bar.classList.remove('paused','done','stopped');
+  if(job.status==='paused')bar.classList.add('paused');
+  if(job.status==='done')bar.classList.add('done');
+  if(job.status==='stopped')bar.classList.add('stopped');
+  setPill(job.status,{running:'Running…',paused:'Paused',done:'Complete',stopped:'Stopped',error:'Error'}[job.status]||job.status);
+}
+function updateSS(){
+  document.getElementById('ss-t').textContent=S.sT;
+  document.getElementById('ss-d').textContent=S.sD;
+  document.getElementById('ss-f').textContent=S.sF;
+  document.getElementById('ss-n').textContent=S.sN;
+}
+function setPill(cls,txt){
+  document.getElementById('sp-dot').className='spdot '+cls;
+  document.getElementById('sp-txt').textContent=txt;
+}
+
+async function onDone(jid){
+  setPill('done','Complete');
+  document.getElementById('btn-pause').disabled=true;
+  document.getElementById('btn-stop').disabled=true;
+  document.getElementById('btn-start').disabled=false;
+  stopElapsed();
+  log('✓ Job complete · '+S.sF+' found, '+S.sN+' N/A','ok');
+  toast('Scraping complete!','ok');
+  updateQItem(jid,S.jobs[jid]);
+  // Save to Supabase
+  await saveToCloud(S.jobs[jid]);
+  // Save to localStorage fallback
+  saveLocalHist(S.jobs[jid]);
+  loadHistBadge();
+}
+function onError(jid,err){
+  setPill('error','Error');
+  document.getElementById('btn-pause').disabled=true;
+  document.getElementById('btn-stop').disabled=true;
+  document.getElementById('btn-start').disabled=false;
+  stopElapsed(); log('Error: '+err,'err'); toast('Error: '+err,'err');
+}
+
+// ═══════════════════════════════════════════════
+//  SUPABASE CLOUD SAVE
+// ═══════════════════════════════════════════════
+async function saveToCloud(job){
+  if(!sbConnected()){log('Cloud sync skipped — not configured','warn');return}
+  try{
+    const results=job.results||[];
+    const found=results.filter(r=>r.associated_members&&r.associated_members!=='N/A').length;
+    const failed=results.filter(r=>r.associated_members==='N/A').length;
+    const timings=job.timings||[];
+    const avg_t=timings.length?parseFloat((timings.reduce((a,b)=>a+b,0)/timings.length).toFixed(2)):0;
+    const clean=results.map(r=>{const o={...r};delete o._status;delete o._time_s;return o});
+    const {error}=await sbClient.from('job_history').upsert({
+      job_id:      job.id,
+      device_id:   DEVICE_ID,
+      filename:    job.filename,
+      started_at:  new Date(job.startMs||Date.now()).toISOString(),
+      finished_at: new Date().toISOString(),
+      total:       job.total,
+      found, failed, avg_time_s: avg_t,
+      success_rate: job.total?parseFloat((found/job.total*100).toFixed(1)):0,
+      results_json: clean,
+      columns_json: job.cols||[],
+    },{onConflict:'job_id'});
+    if(error)throw error;
+    log('✓ Synced to Supabase cloud','ok');
+    toast('Saved to cloud','ok');
+  }catch(e){
+    log('Cloud sync error: '+e.message,'err');
+    toast('Cloud sync failed — saved locally','warn');
+  }
+}
+
+// ═══════════════════════════════════════════════
+//  TABLE
+// ═══════════════════════════════════════════════
+function renderTable(filter=''){
+  const job=S.jobs[S.activeJid];
+  const results=job?job.results:S.rows.map(r=>({...r}));
+  const cols=job?job.cols:S.cols;
+  if(!results.length){
+    document.getElementById('empty-s').style.display='flex';
+    document.getElementById('tbl-wrap').style.display='none'; return;
+  }
+  document.getElementById('empty-s').style.display='none';
+  document.getElementById('tbl-wrap').style.display='block';
+  const q=(filter||'').toLowerCase();
+  const rf=document.getElementById('range-sel').value;
+  const filtered=results.filter(r=>{
+    if(q&&!Object.values(r).some(v=>String(v).toLowerCase().includes(q)))return false;
+    if(rf!==''){const cnt=r.associated_members;if(!cnt||cnt==='N/A')return false;return inRange(cnt,rf)}
+    return true;
+  });
+  document.getElementById('rt-cnt').textContent=filtered.length+' rows';
+  const head=document.getElementById('tbl-head');
+  if(!head.innerHTML){
+    head.innerHTML='<tr><th style="width:3px;padding:0"></th><th style="width:30px">#</th>'+
+      cols.map(c=>'<th>'+c+'</th>').join('')+
+      '<th>Count</th><th>Range</th><th>Status</th></tr>';
+  }
+  const body=document.getElementById('tbl-body'); body.innerHTML='';
+  filtered.forEach((row,i)=>{
+    const cnt=row.associated_members;
+    const hasCnt=cnt!==undefined&&cnt!==null&&cnt!=='';
+    const isNA=cnt==='N/A';
+    const status=row._status||(cnt===undefined?'pending':isNA?'na':'done');
+    const cntHtml=!hasCnt?'<span class="cnt-v p">—</span>':isNA?'<span class="cnt-v na">N/A</span>':`<span class="cnt-v">${Number(cnt).toLocaleString()}</span>`;
+    const rangeHtml=hasCnt&&!isNA?`<span class="rb ${getRangeCls(cnt)}">${getRangeLabel(cnt)}</span>`:'<span style="color:var(--t3);font-size:10px">—</span>';
+    const stHtml={pending:'<span class="stag pending">Pending</span>',processing:'<span class="stag processing"><span class="spin">↻</span> Scraping</span>',done:'<span class="stag done">✓ Done</span>',na:'<span class="stag na">N/A</span>'}[status]||'<span class="stag pending">Pending</span>';
+    const cells=cols.map(c=>{const v=row[c]||'';const isUrl=String(v).includes('linkedin.com')||String(v).startsWith('http');return isUrl?`<td class="url-c" title="${v}"><a href="${v}" target="_blank">${String(v).replace(/https?:\/\/(www\.)?linkedin\.com\/company\//,'').replace(/\/$/,'')}</a></td>`:`<td title="${v}">${v}</td>`}).join('');
+    const tr=document.createElement('tr'); tr.className='rs-'+status;
+    tr.innerHTML=`<td class="rs"><span></span></td><td class="rn">${i+1}</td>${cells}<td>${cntHtml}</td><td>${rangeHtml}</td><td>${stHtml}</td>`;
+    body.appendChild(tr);
+  });
+  body.scrollTop=body.scrollHeight;
+}
+function filterTbl(q){renderTable(q)}
+
+// ═══════════════════════════════════════════════
+//  QUEUE UI
+// ═══════════════════════════════════════════════
+function addQItem(jid,fname,total){
+  const list=document.getElementById('queue-list');
+  list.querySelector('.q-empty')?.remove();
+  const el=document.createElement('div'); el.className='qi'; el.id='qi-'+jid;
+  el.innerHTML=`<div class="qi-top"><div class="qidot running" id="qd-${jid}"></div><div class="qi-name">${fname}</div><div class="qi-acts"><button class="qi-btn" title="Pause/Resume" onclick="togglePause('${jid}')" id="qpb-${jid}">⏸</button><button class="qi-btn g" title="Download" onclick="dlJob('${jid}','xlsx')">↓</button></div></div><div class="qi-meta" id="qm-${jid}">0 / ${total}</div><div class="qi-bar"><div class="qi-fill" id="qf-${jid}"></div></div>`;
+  list.appendChild(el);
+}
+function updateQItem(jid,job){
+  const dot=document.getElementById('qd-'+jid);
+  const meta=document.getElementById('qm-'+jid);
+  const fill=document.getElementById('qf-'+jid);
+  if(!dot)return;
+  dot.className='qidot '+job.status;
+  if(meta)meta.textContent=`${job.progress} / ${job.total} · ${job.found||0} found`;
+  if(fill){const pct=job.total?Math.round(job.progress/job.total*100):0;fill.style.width=pct+'%';if(job.status==='done')fill.classList.add('done')}
+}
+async function togglePause(jid){
+  const job=S.jobs[jid]; if(!job)return;
+  const btn=document.getElementById('qpb-'+jid);
+  if(jid.startsWith('demo-')){
+    job.status=job.status==='paused'?'running':'paused';
+    if(btn)btn.textContent=job.status==='paused'?'▶':'⏸';
+    toast(job.status==='paused'?'Paused':'Resumed',job.status==='paused'?'warn':'ok');return;
+  }
+  try{
+    if(job.status==='running'){await fetch('/control/'+jid+'/pause',{method:'POST'});job.status='paused';if(btn)btn.textContent='▶';toast('Paused','warn')}
+    else if(job.status==='paused'){await fetch('/control/'+jid+'/resume',{method:'POST'});job.status='running';if(btn)btn.textContent='⏸';toast('Resumed','ok')}
+  }catch(e){toast('Server not reachable','err')}
+}
+
+// ═══════════════════════════════════════════════
+//  PAUSE / STOP
+// ═══════════════════════════════════════════════
+function pauseJob(){if(S.activeJid)togglePause(S.activeJid)}
+let stopTarget=null;
+function openStopModal(){stopTarget=S.activeJid;if(!stopTarget)return;document.getElementById('stop-modal').style.display='flex';document.getElementById('modal-ok').onclick=confirmStop}
+function closeModal(){document.getElementById('stop-modal').style.display='none'}
+async function confirmStop(){
+  closeModal(); const jid=stopTarget; if(!jid)return;
+  try{await fetch('/control/'+jid+'/stop',{method:'POST'})}catch(e){}
+  if(S.jobs[jid])S.jobs[jid].status='stopped';
+  setPill('stopped','Stopped');
+  document.getElementById('btn-pause').disabled=true;
+  document.getElementById('btn-stop').disabled=true;
+  document.getElementById('btn-start').disabled=false;
+  document.getElementById('pz-bar').classList.add('stopped');
+  stopElapsed(); log('Job stopped','warn'); toast('Stopped','warn');
+}
+
+// ═══════════════════════════════════════════════
+//  DOWNLOAD
+// ═══════════════════════════════════════════════
+function dlActive(fmt){dlJob(S.activeJid,fmt)}
+function dlJob(jid,fmt){
+  if(jid&&!jid.startsWith('demo-')){window.location.href='/download/'+jid+'?fmt='+fmt;return}
+  const job=S.jobs[jid]; if(!job||!job.results.length){toast('No results yet','warn');return}
+  const cols=[...(job.cols||S.cols),'associated_members','range'];
+  const rows=job.results.map(r=>{const range=getRangeLabel(r.associated_members);return cols.map(c=>c==='range'?`"${range}"`:`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(',')});
+  exportCsv([cols.join(','),...rows].join('\n'),'linkedscan_results.'+fmt);
+}
+function exportFiltered(){
+  const job=S.jobs[S.activeJid]; if(!job||!job.results.length){toast('No results','warn');return}
+  const q=document.getElementById('rt-s').value.toLowerCase();
+  const rf=document.getElementById('range-sel').value;
+  const filtered=job.results.filter(r=>{
+    if(q&&!Object.values(r).some(v=>String(v).toLowerCase().includes(q)))return false;
+    if(rf!==''&&!inRange(r.associated_members,rf))return false;
+    return true;
+  });
+  const cols=[...(job.cols||S.cols),'associated_members','range'];
+  const rows=filtered.map(r=>{const range=getRangeLabel(r.associated_members);return cols.map(c=>c==='range'?`"${range}"`:`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(',')});
+  exportCsv([cols.join(','),...rows].join('\n'),'linkedscan_filtered.csv');
+  toast('Exported '+filtered.length+' rows','ok');
+}
+function exportCsv(csv,name){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([csv],{type:'text/csv'}));a.download=name;a.click()}
+
+// ═══════════════════════════════════════════════
+//  CLEAR
+// ═══════════════════════════════════════════════
+function clearAll(){
+  if(['running','paused'].includes((S.jobs[S.activeJid]||{}).status)){toast('Stop job first','warn');return}
+  S.rows=[];S.cols=[];S.activeJid=null;S.sD=0;S.sF=0;S.sN=0;
+  document.getElementById('tbl-head').innerHTML=''; document.getElementById('tbl-body').innerHTML='';
+  document.getElementById('tbl-wrap').style.display='none'; document.getElementById('empty-s').style.display='flex';
+  document.getElementById('pz-bar').style.width='0%'; document.getElementById('pz-p').textContent='0%'; document.getElementById('pz-f').textContent='0 / 0';
+  ['st-p','st-f','st-n','st-r'].forEach(id=>document.getElementById(id).textContent='0');
+  ['st-e','st-a'].forEach(id=>document.getElementById(id).textContent='--');
+  document.getElementById('st-el').textContent='0s';
+  document.getElementById('rt-cnt').textContent='0 rows';
+  document.getElementById('queue-list').innerHTML='<div class="q-empty">No jobs queued</div>';
+  document.getElementById('fi').value=''; document.getElementById('dz-fn').textContent='';
+  document.getElementById('done-badge').classList.remove('show');
+  updateSS(); setPill('','Idle'); updateStartBtn();
+  log('Workspace cleared','sys'); toast('Cleared','info');
+}
+
+// ═══════════════════════════════════════════════
+//  LOCAL HISTORY FALLBACK
+// ═══════════════════════════════════════════════
+function saveLocalHist(job){
+  try{
+    const hist=JSON.parse(localStorage.getItem('ls-hist')||'[]');
+    hist.unshift({id:job.id,filename:job.filename,started_at:new Date(job.startMs||Date.now()).toISOString(),finished_at:new Date().toISOString(),total:job.total,found:job.found,failed:job.failed,results:job.results.map(r=>{const o={...r};delete o._status;delete o._time_s;return o}),cols:job.cols});
+    localStorage.setItem('ls-hist',JSON.stringify(hist.slice(0,50)));
+  }catch(e){}
+}
+function getLocalHist(){try{return JSON.parse(localStorage.getItem('ls-hist')||'[]')}catch(e){return[]}}
+
+function loadHistBadge(){
+  let n=getLocalHist().length;
+  const b=document.getElementById('hbadge');
+  b.textContent=n; b.style.display=n?'':'none';
+}
+loadHistBadge();
+
+// ═══════════════════════════════════════════════
+//  HISTORY PAGE
+// ═══════════════════════════════════════════════
+async function loadHistory(){
+  const cont=document.getElementById('hist-content');
+  const bwrap=document.getElementById('sync-banner-wrap');
+
+  // Cloud sync status banner
+  bwrap.innerHTML = sbConnected()
+    ? `<div class="sync-banner synced"><span class="sync-icon">☁️</span><div class="sync-info"><div class="sync-title">Cloud sync active — Device ID: <code style="font-family:var(--mono);font-size:11px">${DEVICE_ID}</code></div><div class="sync-sub">Your history is stored on Supabase. Share your Device ID to access history on another device.</div></div></div>`
+    : `<div class="sync-banner unsynced"><span class="sync-icon">⚠️</span><div class="sync-info"><div class="sync-title">Cloud sync not configured</div><div class="sync-sub">History is stored locally in this browser only. Configure Supabase in Settings to enable persistent cloud storage.</div></div><div class="sync-acts"><button class="btn o" style="height:32px;font-size:11px" onclick="showWizard()">Connect Cloud</button></div></div>`;
+
+  cont.innerHTML='<div style="text-align:center;padding:40px;color:var(--t3);font-size:13px">Loading…</div>';
+
+  let items=[];
+
+  // Try Supabase first
+  if(sbConnected()){
+    try{
+      const {data,error}=await sbClient.from('job_history').select('job_id,filename,started_at,finished_at,total,found,failed,avg_time_s,success_rate,columns_json').eq('device_id',DEVICE_ID).order('created_at',{ascending:false}).limit(100);
+      if(error)throw error;
+      items=(data||[]).map(r=>({...r,_cloud:true}));
+      log('Loaded '+items.length+' history items from cloud','ok');
+    }catch(e){
+      log('Cloud history error: '+e.message,'warn');
+      items=getLocalHist().map(r=>({...r,_cloud:false}));
+    }
+  } else {
+    items=getLocalHist().map(r=>({...r,_cloud:false}));
+  }
+
+  // Also try server SQLite
+  try{
+    const r=await fetch('/history?device_id='+DEVICE_ID);
+    const srv=await r.json();
+    // Merge server items not already in list
+    srv.forEach(s=>{if(!items.find(x=>(x.job_id||x.id)===s.job_id))items.unshift({...s,_cloud:false,_server:true})});
+  }catch(e){}
+
+  document.getElementById('hbadge').textContent=items.length;
+  document.getElementById('hbadge').style.display=items.length?'':'none';
+
+  if(!items.length){cont.innerHTML='<div style="text-align:center;padding:60px;color:var(--t3);font-size:13px;font-family:var(--mono)">No history yet. Complete a scrape job first.</div>';return}
+
+  cont.innerHTML='<div>'+items.map((h,i)=>{
+    const jid=h.job_id||h.id;
+    const total=h.total||0, found=h.found||0, failed=h.failed||0;
+    const rate=total?Math.round(found/total*100):0;
+    const cloudHtml=h._cloud?'<span class="cloud-tag yes">☁ Cloud</span>':h._server?'<span class="cloud-tag no">💾 Server</span>':'<span class="cloud-tag no">📱 Local</span>';
+    return `<div class="hc" style="animation-delay:${i*.04}s">
+      <div class="hc-ico">📊</div>
+      <div class="hc-info">
+        <div class="hc-name">${h.filename||'Unknown'} ${cloudHtml}</div>
+        <div class="hc-meta">${(h.started_at||'').slice(0,19).replace('T',' ')} → ${(h.finished_at||'').slice(0,19).replace('T',' ')}</div>
+        <div class="hc-cloud" id="hc-dl-${jid}"></div>
+      </div>
+      <div class="hc-stats">
+        <div class="hs"><div class="hs-v">${total}</div><div class="hs-l">Total</div></div>
+        <div class="hs"><div class="hs-v g">${found}</div><div class="hs-l">Found</div></div>
+        <div class="hs"><div class="hs-v dim">${failed}</div><div class="hs-l">N/A</div></div>
+        <div class="hs"><div class="hs-v" style="font-size:14px;color:var(--t2)">${rate}%</div><div class="hs-l">Rate</div></div>
+      </div>
+      <div class="hc-acts">
+        <button class="hbtn xl" onclick="dlHistItem('${jid}','xlsx')">📊 Excel</button>
+        <button class="hbtn cv" onclick="dlHistItem('${jid}','csv')">📄 CSV</button>
+        <button class="hbtn rm" onclick="delHist('${jid}',this)">✕</button>
+      </div>
+    </div>`;
+  }).join('')+'</div>';
+}
+
+async function dlHistItem(jid,fmt){
+  if(!jid.startsWith('demo-')){
+    // Try server download
+    try{window.location.href='/download/'+jid+'?fmt='+fmt;toast('Downloading…','ok');return}catch(e){}
+  }
+  // Try Supabase
+  if(sbConnected()){
+    try{
+      const {data,error}=await sbClient.from('job_history').select('results_json,columns_json,filename').eq('job_id',jid).single();
+      if(!error&&data){
+        const cols=[...(data.columns_json||[]),'associated_members'];
+        const rows=(data.results_json||[]).map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','));
+        exportCsv([cols.join(','),...rows].join('\n'),(data.filename||'results')+'.'+fmt);
+        toast('Downloaded','ok'); return;
+      }
+    }catch(e){}
+  }
+  // Local fallback
+  const hist=getLocalHist(); const h=hist.find(x=>x.id===jid||x.job_id===jid);
+  if(!h){toast('Results not found locally','err');return}
+  const cols=[...(h.cols||[]),'associated_members'];
+  const rows=(h.results||[]).map(r=>cols.map(c=>`"${(r[c]||'').toString().replace(/"/g,'""')}"`).join(','));
+  exportCsv([cols.join(','),...rows].join('\n'),(h.filename||'results')+'.'+fmt);
+  toast('Downloaded (local)','ok');
+}
+
+async function delHist(jid,btn){
+  // Server
+  try{await fetch('/history/'+jid,{method:'DELETE'})}catch(e){}
+  // Supabase
+  if(sbConnected()){try{await sbClient.from('job_history').delete().eq('job_id',jid).eq('device_id',DEVICE_ID)}catch(e){}}
+  // Local
+  try{let h=getLocalHist();h=h.filter(x=>x.id!==jid&&x.job_id!==jid);localStorage.setItem('ls-hist',JSON.stringify(h))}catch(e){}
+  btn.closest('.hc').remove();
+  toast('Deleted','ok'); loadHistBadge();
+}
+
+// ═══════════════════════════════════════════════
+//  ANALYTICS — real-time
+// ═══════════════════════════════════════════════
+let anCharts={}, anTimer=null;
+
+function chartColors(){
+  const dark=document.documentElement.getAttribute('data-theme')==='dark';
+  return{grid:dark?'rgba(255,255,255,0.05)':'rgba(0,0,0,0.06)',label:dark?'#50506a':'#9494b0'};
+}
+function updateChartTheme(ch){
+  const c=chartColors();
+  if(ch.options.scales)Object.values(ch.options.scales).forEach(s=>{if(s.grid)s.grid.color=c.grid;if(s.ticks)s.ticks.color=c.label});
+  if(ch.options.plugins?.legend?.labels)ch.options.plugins.legend.labels.color=c.label;
+  ch.update('none');
+}
+function baseOpts(){
+  const c=chartColors();
+  return{responsive:true,maintainAspectRatio:false,animation:{duration:600},
+    plugins:{legend:{labels:{color:c.label,font:{family:'DM Mono',size:10},boxWidth:10,padding:10}}},
+    scales:{x:{grid:{color:c.grid},ticks:{color:c.label,font:{family:'DM Mono',size:9}}},
+             y:{grid:{color:c.grid},ticks:{color:c.label,font:{family:'DM Mono',size:9}}}}};
+}
+
+async function loadAnalytics(){
+  if(anTimer)clearInterval(anTimer);
+  await renderAnalytics();
+  anTimer=setInterval(renderAnalytics,3000);
+}
+
+async function renderAnalytics(){
+  const cont=document.getElementById('an-content');
+  let data=null;
+
+  // Try server
+  try{const r=await fetch('/analytics?device_id='+DEVICE_ID);data=await r.json()}catch(e){}
+
+  // Try Supabase
+  if((!data||data.empty)&&sbConnected()){
+    try{
+      const {data:rows,error}=await sbClient.from('job_history').select('job_id,filename,started_at,total,found,failed,avg_time_s,success_rate,results_json').eq('device_id',DEVICE_ID).order('created_at',{ascending:true});
+      if(!error&&rows&&rows.length){
+        data=buildAnalyticsFromRows(rows);
+      }
+    }catch(e){}
+  }
+
+  // Local fallback
+  if(!data||data.empty){
+    const localRows=getLocalHist();
+    const activeJob=S.jobs[S.activeJid];
+    const all=[...localRows];
+    if(activeJob&&activeJob.results.length)all.unshift(activeJob);
+    if(!all.length){
+      cont.innerHTML='<div style="text-align:center;padding:80px;color:var(--t3);font-size:12px;font-family:var(--mono)">Complete at least one scrape job to see analytics.</div>';
+      return;
+    }
+    data=buildAnalyticsFromRows(all.map(j=>({total:j.total,found:j.found,failed:j.failed,avg_time_s:j.avg_time_s||2,filename:j.filename,results_json:j.results||[]})));
+  }
+
+  // Inject live data from active job
+  const activeJob=S.jobs[S.activeJid];
+  if(activeJob&&activeJob.results.length){
+    const distKeys=RANGES.map(r=>r.label);
+    distKeys.forEach(k=>{if(!data.distribution[k])data.distribution[k]=0});
+    activeJob.results.forEach(r=>{const cnt=r.associated_members;if(cnt&&cnt!=='N/A'){const i=getRangeIdx(cnt);if(i>=0)data.distribution[RANGES[i].label]++}});
+  }
+
+  const c=chartColors();
+
+  if(!cont.querySelector('.kpi-row')){
+    cont.innerHTML=`
+      <div class="kpi-row">
+        <div class="kpi"><div class="kpi-v" id="an-runs">0</div><div class="kpi-l">Total Runs</div></div>
+        <div class="kpi"><div class="kpi-v" id="an-scr">0</div><div class="kpi-l">Total Scraped</div></div>
+        <div class="kpi g"><div class="kpi-v" id="an-fnd">0</div><div class="kpi-l">Found</div></div>
+        <div class="kpi"><div class="kpi-v" id="an-na" style="color:var(--red-d)">0</div><div class="kpi-l">N/A</div></div>
+        <div class="kpi a"><div class="kpi-v" id="an-rate">0%</div><div class="kpi-l">Success Rate</div></div>
+        <div class="kpi b"><div class="kpi-v" id="an-avg">0s</div><div class="kpi-l">Avg Time/Row</div></div>
+      </div>
+      <div class="ch-grid">
+        <div class="ch-card"><div class="ch-head"><div class="ch-title">Found vs N/A per Run</div><div class="live-dot"></div></div><div class="ch-sub">Live · bar chart</div><div class="ch-wrap"><canvas id="ch-trend"></canvas></div></div>
+        <div class="ch-card"><div class="ch-head"><div class="ch-title">Member Count Range Distribution</div><div class="live-dot"></div></div><div class="ch-sub">Across all scraped companies</div><div class="ch-wrap"><canvas id="ch-dist"></canvas></div></div>
+        <div class="ch-card"><div class="ch-head"><div class="ch-title">Avg Scrape Time / Row (s)</div><div class="live-dot"></div></div><div class="ch-sub">Performance trend</div><div class="ch-wrap"><canvas id="ch-time"></canvas></div></div>
+        <div class="ch-card"><div class="ch-head"><div class="ch-title">Success Rate per Run (%)</div><div class="live-dot"></div></div><div class="ch-sub">Data quality over time</div><div class="ch-wrap"><canvas id="ch-rate"></canvas></div></div>
+      </div>`;
+  }
+
+  document.getElementById('an-runs').textContent=data.total_runs||0;
+  document.getElementById('an-scr').textContent=data.total_scraped||0;
+  document.getElementById('an-fnd').textContent=data.total_found||0;
+  document.getElementById('an-na').textContent=data.total_failed||0;
+  document.getElementById('an-rate').textContent=(data.success_rate||0)+'%';
+  document.getElementById('an-avg').textContent=(data.overall_avg_t||0)+'s';
+
+  const tl=(data.trend||[]).map(r=>(r.label||'').slice(-10));
+  const distL=Object.keys(data.distribution||{});
+  const distV=Object.values(data.distribution||{});
+
+  function mkChart(id,type,d,opts){
+    const el=document.getElementById(id); if(!el)return;
+    if(anCharts[id]){anCharts[id].data=d;updateChartTheme(anCharts[id]);anCharts[id].update()}
+    else{const bo=baseOpts();anCharts[id]=new Chart(el,{type,data:d,options:{...bo,...opts}})}
+  }
+
+  mkChart('ch-trend','bar',{labels:tl,datasets:[
+    {label:'Found',data:(data.trend||[]).map(r=>r.found||0),backgroundColor:'rgba(34,197,94,.65)',borderColor:'#22c55e',borderWidth:1,borderRadius:5},
+    {label:'N/A',data:(data.trend||[]).map(r=>r.failed||0),backgroundColor:'rgba(220,38,38,.5)',borderColor:'#dc2626',borderWidth:1,borderRadius:5},
+  ]},{});
+
+  mkChart('ch-dist','doughnut',{labels:distL,datasets:[{data:distV,backgroundColor:['#64748b','#3b82f6','#f59e0b','#22c55e','#dc2626','#a855f7','#ec4899','#ef4444'],borderColor:'transparent',hoverOffset:10}]},
+    {scales:{},plugins:{legend:{position:'right',labels:{color:c.label,font:{family:'DM Mono',size:9},boxWidth:10,padding:8}}}});
+
+  mkChart('ch-time','line',{labels:(data.time_trend||[]).map(r=>(r.label||'').slice(-10)),datasets:[{label:'Avg time (s)',data:(data.time_trend||[]).map(r=>r.avg_t||0),borderColor:'#dc2626',backgroundColor:'rgba(220,38,38,.07)',pointBackgroundColor:'#dc2626',pointRadius:4,borderWidth:2,tension:.4,fill:true}]},{});
+
+  mkChart('ch-rate','line',{labels:tl,datasets:[{label:'Success %',data:(data.trend||[]).map(r=>r.total?Math.round((r.found||0)/r.total*100):0),borderColor:'#22c55e',backgroundColor:'rgba(34,197,94,.07)',pointBackgroundColor:'#22c55e',pointRadius:4,borderWidth:2,tension:.4,fill:true}]},{scales:{...baseOpts().scales,y:{...baseOpts().scales.y,min:0,max:100}}});
+}
+
+function buildAnalyticsFromRows(rows){
+  const total_scraped=rows.reduce((a,j)=>a+(j.total||0),0);
+  const total_found=rows.reduce((a,j)=>a+(j.found||0),0);
+  const total_failed=rows.reduce((a,j)=>a+(j.failed||0),0);
+  const avgs=rows.map(j=>j.avg_time_s||j.avg_t||0).filter(Boolean);
+  const overall_avg_t=avgs.length?parseFloat((avgs.reduce((a,b)=>a+b,0)/avgs.length).toFixed(2)):0;
+  const dist={}; RANGES.forEach(r=>{dist[r.label]=0});
+  rows.forEach(j=>(j.results_json||j.results||[]).forEach(r=>{const cnt=r.associated_members;if(cnt&&cnt!=='N/A'){const i=getRangeIdx(cnt);if(i>=0)dist[RANGES[i].label]++}}));
+  const trend=rows.slice(-20).map(j=>({label:j.filename||'Run',found:j.found||0,failed:j.failed||0,total:j.total||0,avg_t:j.avg_time_s||j.avg_t||0}));
+  return{total_runs:rows.length,total_scraped,total_found,total_failed,overall_avg_t,success_rate:total_scraped?parseFloat((total_found/total_scraped*100).toFixed(1)):0,trend,distribution:dist,time_trend:trend.map(r=>({label:r.label,avg_t:r.avg_t}))};
+}
+
+// ═══════════════════════════════════════════════
+//  SETTINGS
+// ═══════════════════════════════════════════════
+async function loadSettings(){
+  const cont=document.getElementById('set-content');
+  let cfg={workers:'2',min_delay:'1.5',max_delay:'3.0',retries:'2',headless:'true',rotate_ua:'true'};
+  try{const r=await fetch('/settings');cfg=await r.json()}catch(e){}
+  const sbUrl=localStorage.getItem('sb-url')||'';
+  const sbKey=localStorage.getItem('sb-key')||'';
+  const sbOk=sbConnected();
+
+  cont.innerHTML=`
+    <div class="set-grid">
+
+      <div class="set-card">
+        <div class="set-title">⚡ Speed &amp; Performance</div>
+        <div class="set-row">
+          <div class="set-lbl">Parallel Workers</div>
+          <select class="set-sel" id="s-workers">
+            <option value="1" ${cfg.workers=='1'?'selected':''}>1 worker — safest</option>
+            <option value="2" ${cfg.workers=='2'?'selected':''}>2 workers — recommended (~4 min/100)</option>
+            <option value="3" ${cfg.workers=='3'?'selected':''}>3 workers — fastest (~2.5 min/100)</option>
+          </select>
+          <div class="set-desc">More workers = faster. Higher risk with 3+.</div>
+        </div>
+        <div class="set-row">
+          <div class="set-lbl">Min Delay (s)</div>
+          <input class="set-inp" type="number" id="s-min" value="${cfg.min_delay}" min="0.5" max="10" step="0.5"/>
+          <div class="set-desc">Minimum pause between requests.</div>
+        </div>
+        <div class="set-row">
+          <div class="set-lbl">Max Delay (s)</div>
+          <input class="set-inp" type="number" id="s-max" value="${cfg.max_delay}" min="1" max="20" step="0.5"/>
+          <div class="set-desc">Upper bound of random delay window.</div>
+        </div>
+        <div class="set-row">
+          <div class="set-lbl">Retry Count</div>
+          <select class="set-sel" id="s-retry">
+            <option value="0" ${cfg.retries=='0'?'selected':''}>No retry</option>
+            <option value="1" ${cfg.retries=='1'?'selected':''}>1 retry</option>
+            <option value="2" ${cfg.retries=='2'?'selected':''}>2 retries</option>
+            <option value="3" ${cfg.retries=='3'?'selected':''}>3 retries</option>
+          </select>
+        </div>
+        <div class="set-row">
+          <div class="set-lbl">Headless Browser</div>
+          <div class="tog-row">
+            <span style="font-size:12px;color:var(--t2)">Run invisibly (recommended)</span>
+            <div class="tog ${cfg.headless==='true'?'on':''}" id="t-headless" onclick="this.classList.toggle('on')"></div>
+          </div>
+        </div>
+        <div class="set-row">
+          <div class="set-lbl">Rotate User Agents</div>
+          <div class="tog-row">
+            <span style="font-size:12px;color:var(--t2)">Different fingerprint per worker</span>
+            <div class="tog ${cfg.rotate_ua==='true'?'on':''}" id="t-ua" onclick="this.classList.toggle('on')"></div>
+          </div>
+          <div class="set-desc">Reduces detection probability.</div>
+        </div>
+        <div class="warn-card">
+          <strong>Anti-ban active:</strong> human-like typing · random delays · UA rotation · webdriver spoofed · realistic navigator.plugins
+        </div>
+        <button class="save-btn" onclick="saveSettings()">Save Settings</button>
+      </div>
+
+      <div class="set-card ${sbOk?'sb-card':''}">
+        <div class="set-title">☁️ Supabase Cloud Sync <span style="font-size:11px;font-weight:400;color:${sbOk?'var(--green)':'var(--t3)'}"> — ${sbOk?'Connected ✓':'Not connected'}</span></div>
+
+        <div style="background:var(--s2);border:1px solid var(--b);border-radius:10px;padding:14px;margin-bottom:16px;font-size:12px;color:var(--t2);line-height:1.8">
+          <strong style="color:var(--t1)">Your Device ID:</strong><br>
+          <code style="font-family:var(--mono);font-size:11px;color:var(--red);background:var(--red-a);padding:2px 8px;border-radius:4px;display:inline-block;margin-top:4px">${DEVICE_ID}</code>
+          <br><span style="font-size:10px;color:var(--t3);margin-top:4px;display:block">Share this ID to access your history from another device.</span>
+        </div>
+
+        <div class="set-row">
+          <div class="set-lbl">Supabase Project URL</div>
+          <input class="set-inp" type="url" id="sb-url-inp" value="${sbUrl}" placeholder="https://xxxxxx.supabase.co"/>
+        </div>
+        <div class="set-row">
+          <div class="set-lbl">Supabase Anon Key</div>
+          <input class="set-inp" type="text" id="sb-key-inp" value="${sbKey}" placeholder="eyJhbGci…"/>
+          <div class="set-desc">Use the <strong>anon/public</strong> key, not the service_role key.</div>
+        </div>
+
+        <div style="margin-top:4px">
+          <button class="save-btn" onclick="saveSbSettings()" style="${sbOk?'background:var(--green)':''}">
+            ${sbOk?'Update Connection':'Connect to Supabase'}
+          </button>
+          <button style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:transparent;color:var(--t3);border:1px solid var(--b);font-size:12px;cursor:pointer;font-family:var(--ff)" onclick="showWizard()">
+            📖 Setup Wizard
+          </button>
+          ${sbOk?`<button style="width:100%;margin-top:8px;padding:9px;border-radius:8px;background:transparent;color:var(--red);border:1px solid rgba(220,38,38,.25);font-size:12px;cursor:pointer;font-family:var(--ff)" onclick="disconnectSb()">Disconnect</button>`:''}
+        </div>
+
+        <div class="warn-card" style="margin-top:14px">
+          <strong>How to set up (free):</strong><br>
+          1. Create account at <strong>supabase.com</strong><br>
+          2. New project → SQL Editor → run <code>supabase_setup.sql</code><br>
+          3. Settings → API → copy URL &amp; anon key → paste above
+        </div>
+      </div>
+
+    </div>`;
+}
+
+async function saveSettings(){
+  const cfg={
+    workers:document.getElementById('s-workers').value,
+    min_delay:document.getElementById('s-min').value,
+    max_delay:document.getElementById('s-max').value,
+    retries:document.getElementById('s-retry').value,
+    headless:document.getElementById('t-headless').classList.contains('on')?'true':'false',
+    rotate_ua:document.getElementById('t-ua').classList.contains('on')?'true':'false',
+  };
+  localStorage.setItem('ls-workers',cfg.workers);
+  try{await fetch('/settings',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(cfg)})}catch(e){}
+  toast('Settings saved','ok'); log('Settings updated','sys');
+}
+
+async function saveSbSettings(){
+  const url=(document.getElementById('sb-url-inp')||{}).value?.trim();
+  const key=(document.getElementById('sb-key-inp')||{}).value?.trim();
+  if(!url||!key){toast('Enter both URL and key','warn');return}
+  toast('Testing connection…','info');
+  try{
+    const client=window.supabase.createClient(url,key);
+    const {error}=await client.from('job_history').select('id').limit(1);
+    if(error&&error.code!=='PGRST116')throw error;
+    localStorage.setItem('sb-url',url); localStorage.setItem('sb-key',key);
+    initSupabase(url,key);
+    updateCloudUI(); toast('Supabase connected!','ok'); log('Cloud sync enabled','ok');
+    loadSettings();
+  }catch(e){toast('Connection failed: '+e.message,'err')}
+}
+
+function disconnectSb(){
+  localStorage.removeItem('sb-url'); localStorage.removeItem('sb-key');
+  sbClient=null; updateCloudUI();
+  toast('Disconnected from Supabase','warn'); loadSettings();
+}
+
+// ── Init
+log('LinkedScan v4 ready','sys');
+log('Device ID: '+DEVICE_ID,'info');
+log(sbConnected()?'Cloud sync: connected ✓':'Cloud sync: not configured · go to Settings','warn');
+</script>
+</body>
+</html>
