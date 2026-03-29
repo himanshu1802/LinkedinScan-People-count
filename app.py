@@ -572,6 +572,6 @@ def supabase_status():
 
 
 if __name__ == "__main__":
-    print("\n  LinkedScan v4 — Supabase Edition")
-    print("   http://localhost:5000\n")
-    app.run(debug=False, port=5000, threaded=True)
+    port = int(os.environ.get("PORT", 5000))
+    print(f"\n  LinkedScan v4 — running on port {port}\n")
+    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
