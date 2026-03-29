@@ -1,3 +1,7 @@
+## 🌐 Live Demo
+
+👉 https://linkedinscan-ecount.up.railway.app
+
 # LinkedScan — LinkedIn People Intelligence Platform
 
 ![Python](https://img.shields.io/badge/Python-3.10+-blue?style=flat-square&logo=python)
