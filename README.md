@@ -1,6 +1,6 @@
 ## 🌐 Live Demo
 
-👉 https://linkedinscan-ecount.up.railway.app
+👉 https://linkedinscan-people-count.onrender.com/
 
 # LinkedScan — LinkedIn People Intelligence Platform
 
