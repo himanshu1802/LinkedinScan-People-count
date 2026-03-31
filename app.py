@@ -203,7 +203,7 @@ def get_driver():
 
     driver = webdriver.Chrome(service=service, options=options)
     driver.execute_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
-    return driverr
+    return driver
 
 
 def linkedin_login(driver, email, password):
