@@ -19,11 +19,10 @@ from flask import Flask, request, jsonify, send_file, render_template
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from webdriver_manager.chrome import ChromeDriverManager
+from selenium.webdriver.chrome.service import Service
 
 load_dotenv()
 
@@ -184,7 +183,6 @@ USER_AGENTS = [
 
 def get_driver():
     import os
-    
     options = Options()
     options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
@@ -197,7 +195,6 @@ def get_driver():
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
 
-    # Use system Chrome installed via Dockerfile
     chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
     options.binary_location = chrome_bin
 
@@ -206,7 +203,7 @@ def get_driver():
 
     driver = webdriver.Chrome(service=service, options=options)
     driver.execute_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
-    return driver
+    return driverr
 
 
 def linkedin_login(driver, email, password):
