@@ -183,23 +183,29 @@ USER_AGENTS = [
 ]
 
 def get_driver():
-    ua = random.choice(USER_AGENTS) if get_setting("rotate_ua") == "true" else USER_AGENTS[0]
+    import os
+    
     options = Options()
-    if get_setting("headless", "true") == "true":
-        options.add_argument("--headless=new")
+    options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
+    options.add_argument("--disable-gpu")
     options.add_argument("--window-size=1440,900")
     options.add_argument("--disable-blink-features=AutomationControlled")
-    options.add_argument(f"user-agent={ua}")
+    options.add_argument("--single-process")
+    options.add_argument("--no-zygote")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
-    service = Service(ChromeDriverManager().install())
-    driver  = webdriver.Chrome(service=service, options=options)
-    driver.execute_cdp_cmd("Network.setUserAgentOverride", {"userAgent": ua})
+
+    # Use system Chrome installed via Dockerfile
+    chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+    options.binary_location = chrome_bin
+
+    chromedriver = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
+    service = Service(chromedriver)
+
+    driver = webdriver.Chrome(service=service, options=options)
     driver.execute_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
-    driver.execute_script("Object.defineProperty(navigator,'plugins',{get:()=>[1,2,3,4,5]})")
-    driver.execute_script("Object.defineProperty(navigator,'languages',{get:()=>['en-US','en']})")
     return driver
 
 
