@@ -1,13 +1,10 @@
 """
-LinkedScan — Flask Backend with Supabase Sync
-================================================
-History is stored in BOTH:
-  • Local SQLite  (linkedscan.db) — always works
-  • Supabase      (cloud)         — if configured in .env
-
-Run:
-    pip install -r requirements.txt
-    python app.py
+LinkedScan — Flask Backend (Render / Railway / Docker)
+Fixed:
+  1. Removed webdriver_manager import
+  2. DB_PATH uses /tmp (works on all cloud servers)
+  3. get_driver() uses system Chromium
+  4. app.run() uses host=0.0.0.0 and PORT from env
 """
 
 import re, time, threading, uuid, io, json, sqlite3, random, os
@@ -19,10 +16,10 @@ from flask import Flask, request, jsonify, send_file, render_template
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
+from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from selenium.webdriver.chrome.service import Service
 
 load_dotenv()
 
@@ -33,11 +30,10 @@ SUPABASE_URL = os.getenv("SUPABASE_URL", "")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
 
 def supabase_insert(table, data):
-    """POST a row to Supabase via REST API."""
     if not SUPABASE_URL or not SUPABASE_KEY:
         return
     try:
-        import urllib.request, urllib.error
+        import urllib.request
         payload = json.dumps(data).encode()
         req = urllib.request.Request(
             f"{SUPABASE_URL}/rest/v1/{table}",
@@ -55,7 +51,6 @@ def supabase_insert(table, data):
         print(f"[Supabase insert warning] {e}")
 
 def supabase_delete(table, job_id):
-    """DELETE a row from Supabase."""
     if not SUPABASE_URL or not SUPABASE_KEY:
         return
     try:
@@ -73,8 +68,8 @@ def supabase_delete(table, job_id):
         print(f"[Supabase delete warning] {e}")
 
 
-# ─── SQLite ───────────────────────────────────────────────────────────────────
-DB_PATH = "linkedscan.db"
+# ─── SQLite (/tmp works on Render, Railway, Docker) ───────────────────────────
+DB_PATH = os.path.join(os.environ.get("TMPDIR", "/tmp"), "linkedscan.db")
 
 def init_db():
     con = sqlite3.connect(DB_PATH)
@@ -126,17 +121,16 @@ def set_setting(key, value):
     con.close()
 
 def save_history(job, device_id="anonymous"):
-    results  = job.get("results", [])
-    found    = sum(1 for r in results if r.get("associated_members") not in (None,"N/A",""))
-    failed   = sum(1 for r in results if r.get("associated_members") == "N/A")
-    timings  = [r.get("_time_s", 0) for r in results if r.get("_time_s")]
-    avg_t    = round(sum(timings)/len(timings), 2) if timings else 0
-    rate     = round(found/len(results)*100, 1) if results else 0
-    clean    = [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]
-    cols     = job.get("columns", [])
-    rec_id   = str(uuid.uuid4())
+    results = job.get("results", [])
+    found   = sum(1 for r in results if r.get("associated_members") not in (None,"N/A",""))
+    failed  = sum(1 for r in results if r.get("associated_members") == "N/A")
+    timings = [r.get("_time_s", 0) for r in results if r.get("_time_s")]
+    avg_t   = round(sum(timings)/len(timings), 2) if timings else 0
+    rate    = round(found/len(results)*100, 1) if results else 0
+    clean   = [{k: v for k, v in r.items() if not k.startswith("_")} for r in results]
+    cols    = job.get("columns", [])
+    rec_id  = str(uuid.uuid4())
 
-    # SQLite
     con = sqlite3.connect(DB_PATH)
     con.execute("""
         INSERT OR REPLACE INTO job_history
@@ -153,21 +147,15 @@ def save_history(job, device_id="anonymous"):
     con.commit()
     con.close()
 
-    # Supabase (background thread to not block)
     def push():
         supabase_insert("job_history", {
-            "job_id":       job["id"],
-            "device_id":    device_id,
-            "filename":     job.get("filename","unknown"),
-            "started_at":   job.get("started_at"),
-            "finished_at":  job.get("finished_at"),
-            "total":        len(results),
-            "found":        found,
-            "failed":       failed,
-            "avg_time_s":   avg_t,
-            "success_rate": rate,
-            "results_json": clean,
-            "columns_json": cols,
+            "job_id": job["id"], "device_id": device_id,
+            "filename": job.get("filename","unknown"),
+            "started_at": job.get("started_at"),
+            "finished_at": job.get("finished_at"),
+            "total": len(results), "found": found, "failed": failed,
+            "avg_time_s": avg_t, "success_rate": rate,
+            "results_json": clean, "columns_json": cols,
         })
     threading.Thread(target=push, daemon=True).start()
 
@@ -182,27 +170,32 @@ USER_AGENTS = [
 ]
 
 def get_driver():
-    import os
+    """Uses system Chromium installed via Dockerfile. NO webdriver_manager."""
+    ua = random.choice(USER_AGENTS) if get_setting("rotate_ua") == "true" else USER_AGENTS[0]
+
     options = Options()
-    options.add_argument("--headless=new")
+    if get_setting("headless", "true") == "true":
+        options.add_argument("--headless=new")
     options.add_argument("--no-sandbox")
     options.add_argument("--disable-dev-shm-usage")
     options.add_argument("--disable-gpu")
-    options.add_argument("--window-size=1440,900")
-    options.add_argument("--disable-blink-features=AutomationControlled")
     options.add_argument("--single-process")
     options.add_argument("--no-zygote")
+    options.add_argument("--window-size=1440,900")
+    options.add_argument("--disable-blink-features=AutomationControlled")
+    options.add_argument(f"user-agent={ua}")
     options.add_experimental_option("excludeSwitches", ["enable-automation"])
     options.add_experimental_option("useAutomationExtension", False)
 
-    chrome_bin = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
-    options.binary_location = chrome_bin
-
-    chromedriver = os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver")
-    service = Service(chromedriver)
+    # System Chromium — set via env vars or default Linux paths
+    options.binary_location = os.environ.get("CHROME_BIN", "/usr/bin/chromium")
+    service = Service(os.environ.get("CHROMEDRIVER_PATH", "/usr/bin/chromedriver"))
 
     driver = webdriver.Chrome(service=service, options=options)
+    driver.execute_cdp_cmd("Network.setUserAgentOverride", {"userAgent": ua})
     driver.execute_script("Object.defineProperty(navigator,'webdriver',{get:()=>undefined})")
+    driver.execute_script("Object.defineProperty(navigator,'plugins',{get:()=>[1,2,3,4,5]})")
+    driver.execute_script("Object.defineProperty(navigator,'languages',{get:()=>['en-US','en']})")
     return driver
 
 
@@ -261,18 +254,14 @@ def fetch_members(driver, company_url, retries=None):
                 time.sleep(3)
             body = driver.find_element(By.TAG_NAME, "body").text
             m = re.search(r"([\d,]+)\s+associated members", body, re.IGNORECASE)
-            if m:
-                return m.group(1).replace(",", "")
+            if m: return m.group(1).replace(",", "")
             m = re.search(r"([\d,]+)\s*(?:employees on LinkedIn|employees|members)", body, re.IGNORECASE)
-            if m:
-                return m.group(1).replace(",", "")
-            # fallback: about page
+            if m: return m.group(1).replace(",", "")
             driver.get(company_url + "/about/")
             time.sleep(3)
             body = driver.find_element(By.TAG_NAME, "body").text
             m = re.search(r"([\d,]+)\s*(?:associated members|employees on LinkedIn|employees)", body, re.IGNORECASE)
-            if m:
-                return m.group(1).replace(",", "")
+            if m: return m.group(1).replace(",", "")
         except Exception:
             if attempt < retries:
                 time.sleep(random.uniform(2, 4))
@@ -315,8 +304,8 @@ def run_job(job_id, rows, columns, email, password, n_workers, device_id):
                         break
                     i = current[0]
                     current[0] += 1
-                url = normalize_url(extract_url(rows[i]))
-                t0  = time.time()
+                url     = normalize_url(extract_url(rows[i]))
+                t0      = time.time()
                 count   = fetch_members(driver, url, retries)
                 elapsed = round(time.time() - t0, 2)
                 result  = dict(rows[i])
@@ -367,7 +356,7 @@ def upload():
     device_id = request.form.get("device_id", "anonymous")
     if not email or not password:
         return jsonify({"error": "Credentials required"}), 400
-    filename  = file.filename.lower()
+    filename = file.filename.lower()
     try:
         df = pd.read_csv(file) if filename.endswith(".csv") else pd.read_excel(file)
     except Exception as e:
@@ -405,12 +394,12 @@ def status(job_id):
     job = jobs.get(job_id)
     if not job:
         return jsonify({"error": "Not found"}), 404
-    timings  = job.get("timings", [])
-    avg_t    = round(sum(timings)/len(timings), 2) if timings else 0
-    n_workers= int(get_setting("workers", "2"))
-    eta_s    = round(avg_t*(job["total"]-job["progress"])/n_workers) if avg_t and job["total"]>job["progress"] else 0
-    found    = sum(1 for r in job["results"] if r.get("associated_members") not in (None,"N/A",""))
-    failed   = sum(1 for r in job["results"] if r.get("associated_members") == "N/A")
+    timings   = job.get("timings", [])
+    avg_t     = round(sum(timings)/len(timings), 2) if timings else 0
+    n_workers = int(get_setting("workers", "2"))
+    eta_s     = round(avg_t*(job["total"]-job["progress"])/n_workers) if avg_t and job["total"]>job["progress"] else 0
+    found     = sum(1 for r in job["results"] if r.get("associated_members") not in (None,"N/A",""))
+    failed    = sum(1 for r in job["results"] if r.get("associated_members") == "N/A")
     return jsonify({
         "status": job["status"], "progress": job["progress"],
         "total": job["total"], "error": job.get("error"),
@@ -435,9 +424,9 @@ def control(job_id, action):
     job = jobs.get(job_id)
     if not job:
         return jsonify({"error": "Not found"}), 404
-    if action == "pause":   job["_pause_evt"].clear(); job["status"] = "paused"
-    elif action == "resume": job["_pause_evt"].set();  job["status"] = "running"
-    elif action == "stop":   job["_stop_evt"].set();   job["_pause_evt"].set()
+    if action == "pause":    job["_pause_evt"].clear(); job["status"] = "paused"
+    elif action == "resume": job["_pause_evt"].set();   job["status"] = "running"
+    elif action == "stop":   job["_stop_evt"].set();    job["_pause_evt"].set()
     return jsonify({"ok": True})
 
 
@@ -454,7 +443,6 @@ def download(job_id):
         if row: results = json.loads(row[0])
     if not results:
         return jsonify({"error": "No results"}), 400
-
     df  = pd.DataFrame(results)
     out = io.BytesIO()
     fmt = request.args.get("fmt", "xlsx")
@@ -468,7 +456,6 @@ def download(job_id):
             as_attachment=True, download_name="linkedscan_results.xlsx")
 
 
-# ─── History (SQLite — device-scoped) ─────────────────────────────────────────
 @app.route("/history")
 def history_list():
     device_id = request.args.get("device_id", "anonymous")
@@ -476,8 +463,7 @@ def history_list():
     rows = con.execute("""
         SELECT job_id, filename, started_at, finished_at,
                total, found, failed, avg_time_s, success_rate, columns_json
-        FROM job_history
-        WHERE device_id = ?
+        FROM job_history WHERE device_id=?
         ORDER BY created_at DESC LIMIT 100
     """, (device_id,)).fetchall()
     con.close()
@@ -495,7 +481,6 @@ def history_delete(job_id):
     return jsonify({"ok": True})
 
 
-# ─── Analytics ────────────────────────────────────────────────────────────────
 @app.route("/analytics")
 def analytics():
     device_id = request.args.get("device_id", "anonymous")
@@ -519,14 +504,14 @@ def analytics():
               "found":r[4], "failed":r[5], "total":r[3], "avg_t":r[6] or 0} for r in rows]
     buckets = {"0-20":0,"21-50":0,"51-100":0,"101-500":0,"501-1K":0,"1K-5K":0,"5K-10K":0,"10K+":0}
     def bucket(c):
-        if   c<=20:    return "0-20"
-        elif c<=50:    return "21-50"
-        elif c<=100:   return "51-100"
-        elif c<=500:   return "101-500"
-        elif c<=1000:  return "501-1K"
-        elif c<=5000:  return "1K-5K"
+        if c<=20: return "0-20"
+        elif c<=50: return "21-50"
+        elif c<=100: return "51-100"
+        elif c<=500: return "101-500"
+        elif c<=1000: return "501-1K"
+        elif c<=5000: return "1K-5K"
         elif c<=10000: return "5K-10K"
-        else:          return "10K+"
+        else: return "10K+"
     for r in rows:
         try:
             for item in json.loads(r[8]):
@@ -540,11 +525,10 @@ def analytics():
         "total_found": total_found, "total_failed": total_failed,
         "overall_avg_t": overall_avg, "success_rate": success_rate,
         "trend": trend[-20:], "distribution": buckets,
-        "time_trend": [{"label":r[1] or r[0][:8], "avg_t":round(r[6],2)} for r in rows if r[6]][-20:],
+        "time_trend": [{"label":r[1] or r[0][:8],"avg_t":round(r[6],2)} for r in rows if r[6]][-20:],
     })
 
 
-# ─── Settings ─────────────────────────────────────────────────────────────────
 @app.route("/settings", methods=["GET"])
 def get_settings():
     con = sqlite3.connect(DB_PATH)
@@ -568,13 +552,10 @@ def update_settings():
 
 @app.route("/supabase-status")
 def supabase_status():
-    return jsonify({
-        "configured": bool(SUPABASE_URL and SUPABASE_KEY),
-        "url": SUPABASE_URL,
-    })
+    return jsonify({"configured": bool(SUPABASE_URL and SUPABASE_KEY), "url": SUPABASE_URL})
 
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
+    print(f"\n  LinkedScan v4 — running on port {port}\n")
     app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
-  
